@@ -1,10 +1,10 @@
 /**
  * 3D Overland World Map Component
- * - Ultra-smooth Zoom In / Zoom Out and Continental Bird's-Eye Overview
- * - Rock-solid Directional Pan (سەرێ / Up, خوارێ / Down, ڕاست / Right, چەپ / Left)
- * - Zero screen jumping or snapping: seamless continuous camera target interpolation
- * - 3D Floating settlement nameplates & banners (visible from far away)
- * - Click-to-march directly into settlements with auto-arrival trigger
+ * - Single-finger fluid map pan (Up, Down, Left, Right)
+ * - Two-finger pinch-to-zoom (In & Out)
+ * - Tap to march directly into castles & cities
+ * - 20+ prominent cities and castles with 3D floating banners
+ * - Minimalist floating action pills (Center character, Full realm overview)
  */
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -16,10 +16,6 @@ import {
   ZoomOut, 
   MapPin, 
   Eye, 
-  ChevronUp, 
-  ChevronDown, 
-  ChevronLeft, 
-  ChevronRight,
   Compass
 } from 'lucide-react';
 
@@ -40,7 +36,7 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
   const stateRef = useRef(gameState);
   stateRef.current = gameState;
 
-  // Camera Target: Starts exactly at player position and glides continuously
+  // Continuous Camera Target: Initialized at player coordinates
   const initialPlayerX = gameState.parties['player_party']?.x ?? -25;
   const initialPlayerZ = gameState.parties['player_party']?.z ?? -15;
 
@@ -49,30 +45,17 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
     z: initialPlayerZ,
   });
 
-  // Flag: automatically follow player unless user pans
   const isFollowingPlayerRef = useRef<boolean>(true);
-
-  // Zoom factor: 0.7 (close-up) to 3.2 (full continent board overview)
   const zoomLevelRef = useRef<number>(1.1);
-  const [zoomDisplay, setZoomDisplay] = useState<number>(1.1);
   const [isFollowing, setIsFollowing] = useState<boolean>(true);
-
-  // Zoom In / Out Handlers
-  const handleZoom = (delta: number) => {
-    sfx.playClick();
-    const newZoom = Math.max(0.65, Math.min(3.4, zoomLevelRef.current + delta));
-    zoomLevelRef.current = newZoom;
-    setZoomDisplay(newZoom);
-  };
 
   // Full Continent Realm Overview
   const handleFullMapOverview = () => {
     sfx.playClick();
     isFollowingPlayerRef.current = false;
     setIsFollowing(false);
-    cameraTargetRef.current = { x: 0, z: 5 }; // Center of map
+    cameraTargetRef.current = { x: 0, z: 0 };
     zoomLevelRef.current = 3.1;
-    setZoomDisplay(3.1);
   };
 
   // Focus Back on Player Character
@@ -85,18 +68,12 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
     isFollowingPlayerRef.current = true;
     setIsFollowing(true);
     zoomLevelRef.current = 1.1;
-    setZoomDisplay(1.1);
   };
 
-  // Directional Pan (سەرێ / خوارێ / ڕاست / چەپ)
-  const handlePan = (dx: number, dz: number) => {
+  // Zoom In / Out Buttons for Desktop Users
+  const handleZoom = (delta: number) => {
     sfx.playClick();
-    isFollowingPlayerRef.current = false;
-    setIsFollowing(false);
-
-    const step = 15 * (zoomLevelRef.current * 0.85);
-    cameraTargetRef.current.x = Math.max(-75, Math.min(75, cameraTargetRef.current.x + dx * step));
-    cameraTargetRef.current.z = Math.max(-75, Math.min(75, cameraTargetRef.current.z + dz * step));
+    zoomLevelRef.current = Math.max(0.65, Math.min(3.4, zoomLevelRef.current + delta));
   };
 
   useEffect(() => {
@@ -125,7 +102,6 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
       0.5,
       1200
     );
-    // Initialize smoothly above target
     camera.position.set(cameraTargetRef.current.x, 60, cameraTargetRef.current.z + 35);
     camera.lookAt(cameraTargetRef.current.x, 0, cameraTargetRef.current.z);
 
@@ -196,6 +172,8 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
 
       if (z > 25) {
         colorHelper.setRGB(0.85, 0.72, 0.45); // Desert sand
+      } else if (z < -50) {
+        colorHelper.setRGB(0.72, 0.78, 0.85); // Frostgard snow
       } else if (h > 6.5) {
         colorHelper.setRGB(0.55, 0.52, 0.5); // Mountain peaks
       } else if (x < -20 && z > 0) {
@@ -232,7 +210,7 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
       return Math.sin(x * 0.04) * Math.cos(z * 0.04) * 2.8;
     }
 
-    // Helper: Create 3D floating canvas text badge for cities/castles
+    // 3D floating canvas text badge for cities/castles
     function createSettlementBadge(s: Settlement): THREE.Sprite {
       const canvas = document.createElement('canvas');
       canvas.width = 256;
@@ -242,7 +220,7 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
         const faction = stateRef.current.factions[s.factionId];
         const bgColor = faction ? faction.color : '#334155';
 
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
         ctx.beginPath();
         ctx.roundRect(6, 6, 244, 84, 18);
         ctx.fill();
@@ -284,7 +262,7 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
       const factionColor = faction ? faction.color : '#ffffff';
 
       const wallMat = new THREE.MeshStandardMaterial({
-        color: s.factionId === 'saruq' ? 0xd8b589 : 0x6e7681,
+        color: s.factionId === 'saruq' ? 0xd8b589 : s.factionId === 'frostgard' ? 0x94a3b8 : 0x6e7681,
         roughness: 0.9,
         metalness: 0.1,
       });
@@ -450,32 +428,35 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
     destMarker.visible = false;
     scene.add(destMarker);
 
-    // 6. Smooth Interaction & Drag Handling
+    // 6. ONE-FINGER PAN & TWO-FINGER PINCH TO ZOOM
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
     let isDragging = false;
     let pointerDownPos = { x: 0, y: 0 };
     let initialPinchDist = 0;
+    let initialPinchZoom = 1.1;
 
-    // Mouse wheel zoom
+    // Mouse wheel zoom for desktop
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const delta = e.deltaY * 0.0016;
-      const nextZoom = Math.max(0.65, Math.min(3.4, zoomLevelRef.current + delta));
-      zoomLevelRef.current = nextZoom;
-      setZoomDisplay(nextZoom);
+      zoomLevelRef.current = Math.max(0.65, Math.min(3.4, zoomLevelRef.current + delta));
     };
-
     container.addEventListener('wheel', onWheel, { passive: false });
 
     const onPointerDown = (e: MouseEvent | TouchEvent) => {
       if ('touches' in e && e.touches.length === 2) {
+        // Two fingers -> Pinch to zoom!
         initialPinchDist = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
         );
+        initialPinchZoom = zoomLevelRef.current;
+        isDragging = true;
         return;
       }
+
+      // One finger / Single mouse click -> Pan or Tap
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
       pointerDownPos = { x: clientX, y: clientY };
@@ -483,33 +464,32 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
     };
 
     const onPointerMove = (e: MouseEvent | TouchEvent) => {
+      // 1. Two-finger pinch-to-zoom
       if ('touches' in e && e.touches.length === 2 && initialPinchDist > 0) {
-        const dist = Math.hypot(
+        const currentDist = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
         );
-        const pinchDelta = (initialPinchDist - dist) * 0.004;
-        const nextZoom = Math.max(0.65, Math.min(3.4, zoomLevelRef.current + pinchDelta));
-        zoomLevelRef.current = nextZoom;
-        setZoomDisplay(nextZoom);
-        initialPinchDist = dist;
+        const scale = initialPinchDist / Math.max(1, currentDist);
+        zoomLevelRef.current = Math.max(0.65, Math.min(3.4, initialPinchZoom * scale));
         isDragging = true;
         return;
       }
 
+      // 2. Single-finger smooth map drag (Up, Down, Left, Right)
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
       const dx = clientX - pointerDownPos.x;
       const dy = clientY - pointerDownPos.y;
       const dist = Math.hypot(dx, dy);
 
-      if (dist > 8) {
+      if (dist > 7) {
         isDragging = true;
         isFollowingPlayerRef.current = false;
         setIsFollowing(false);
 
-        // Smooth 1-to-1 continuous pan (North is Up, South is Down)
-        const panSpeed = 0.075 * zoomLevelRef.current;
+        // Continuous smooth pan without ANY jumping
+        const panSpeed = 0.082 * zoomLevelRef.current;
         cameraTargetRef.current.x = Math.max(-75, Math.min(75, cameraTargetRef.current.x - dx * panSpeed));
         cameraTargetRef.current.z = Math.max(-75, Math.min(75, cameraTargetRef.current.z - dy * panSpeed));
         pointerDownPos = { x: clientX, y: clientY };
@@ -529,7 +509,7 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
 
       raycaster.setFromCamera(mouse, camera);
 
-      // 1. Settlement Click
+      // 1. Settlement Click -> March directly into settlement
       const settlementIntersects = raycaster.intersectObjects(settlementGroup.children, true);
       for (const hit of settlementIntersects) {
         let obj: THREE.Object3D | null = hit.object;
@@ -573,7 +553,7 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
     container.addEventListener('touchmove', onPointerMove, { passive: true });
     container.addEventListener('touchend', onPointerUp, { passive: true });
 
-    // 7. Render Loop with Guaranteed Stability & No Camera Snaps
+    // 7. Render Loop with Continuous Smooth Damping
     let animFrameId = 0;
     let lastTime = performance.now();
 
@@ -624,7 +604,7 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
         destMarker.visible = false;
       }
 
-      // Smooth camera target tracking: if following player, smoothly track player party
+      // Smooth camera tracking: if following player, track player party smoothly
       if (isFollowingPlayerRef.current && playerParty) {
         cameraTargetRef.current.x = THREE.MathUtils.damp(cameraTargetRef.current.x, playerParty.x, 6, dt);
         cameraTargetRef.current.z = THREE.MathUtils.damp(cameraTargetRef.current.z, playerParty.z, 6, dt);
@@ -643,7 +623,6 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
       const targetCamY = groundY + altitudeY;
       const targetCamZ = focusZ + depthZ;
 
-      // Exponential damping ensures buttery smooth movement
       camera.position.x = THREE.MathUtils.damp(camera.position.x, targetCamX, 6, dt);
       camera.position.y = THREE.MathUtils.damp(camera.position.y, targetCamY, 6, dt);
       camera.position.z = THREE.MathUtils.damp(camera.position.z, targetCamZ, 6, dt);
@@ -699,98 +678,58 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
   }, []);
 
   return (
-    <div className="absolute inset-0 w-full h-full overflow-hidden select-none">
+    <div className="absolute inset-0 w-full h-full overflow-hidden select-none touch-none">
       {/* Three.js Canvas Container */}
       <div
         ref={containerRef}
-        className="w-full h-full cursor-crosshair"
+        className="w-full h-full cursor-grab active:cursor-grabbing touch-none"
       />
 
-      {/* Floating Tactical Navigation & D-Pad Dock (Right side) */}
-      <div className="absolute top-20 right-4 z-20 flex flex-col items-center gap-3 pointer-events-auto">
-        {/* Zoom Controls */}
-        <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-1.5 flex flex-col gap-1.5 shadow-2xl">
+      {/* Clean, Non-Intrusive Navigation Pills in Top-Right */}
+      <div className="absolute top-16 right-3 sm:right-6 z-20 flex flex-col items-end gap-2 pointer-events-auto">
+        <div className="flex items-center gap-1.5 bg-stone-900/90 border border-stone-800 rounded-2xl p-1 shadow-2xl backdrop-blur-none">
+          {/* Zoom In button */}
           <button
             onClick={() => handleZoom(-0.35)}
-            className="w-10 h-10 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-300 flex items-center justify-center transition active:scale-95 shadow"
-            title="نزیککردنەوە (Zoom In)"
+            className="w-8 h-8 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-300 flex items-center justify-center transition active:scale-95"
+            title="نزیککردنەوە"
           >
-            <ZoomIn className="w-5 h-5" />
+            <ZoomIn className="w-4 h-4" />
           </button>
 
+          {/* Zoom Out button */}
           <button
             onClick={() => handleZoom(0.35)}
-            className="w-10 h-10 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-300 flex items-center justify-center transition active:scale-95 shadow"
-            title="دوورخستنەوە (Zoom Out)"
+            className="w-8 h-8 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-300 flex items-center justify-center transition active:scale-95"
+            title="دوورخستنەوە"
           >
-            <ZoomOut className="w-5 h-5" />
+            <ZoomOut className="w-4 h-4" />
+          </button>
+
+          {/* Full Continent Overview */}
+          <button
+            onClick={handleFullMapOverview}
+            className="px-3 py-1.5 rounded-xl bg-purple-950/80 hover:bg-purple-900 text-purple-200 text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
+            title="بینینی تەواوی ماپ"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">تەواوی ماپ</span>
+          </button>
+
+          {/* Center Character Focus */}
+          <button
+            onClick={handleFocusPlayer}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95 ${
+              isFollowing
+                ? 'bg-emerald-600 text-white'
+                : 'bg-stone-800 text-stone-300 hover:text-emerald-300'
+            }`}
+            title="گەڕانەوە بۆ سەر کارەکتەر"
+          >
+            <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">کارەکتەر</span>
           </button>
         </div>
-
-        {/* 4-Way Directional D-Pad (سەرێ / خوارێ / ڕاست / چەپ) */}
-        <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-2 flex flex-col items-center gap-1 shadow-2xl">
-          {/* UP (سەرێ) */}
-          <button
-            onClick={() => handlePan(0, -1)}
-            className="w-9 h-9 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 hover:text-amber-300 flex items-center justify-center transition active:scale-90"
-            title="سەرێ (North / Up)"
-          >
-            <ChevronUp className="w-5 h-5" />
-          </button>
-
-          {/* LEFT, CENTER/FOCUS, RIGHT */}
-          <div className="flex items-center gap-1">
-            {/* LEFT (چەپ) */}
-            <button
-              onClick={() => handlePan(-1, 0)}
-              className="w-9 h-9 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 hover:text-amber-300 flex items-center justify-center transition active:scale-90"
-              title="چەپ (West / Left)"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-
-            {/* CENTER / FOCUS CHARACTER (ناوەند) */}
-            <button
-              onClick={handleFocusPlayer}
-              className={`w-9 h-9 rounded-xl flex items-center justify-center transition active:scale-90 shadow ${
-                isFollowing
-                  ? 'bg-emerald-600 text-white font-bold'
-                  : 'bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-emerald-300'
-              }`}
-              title="گەڕانەوە بۆ سەر کارەکتەر"
-            >
-              <MapPin className="w-4 h-4" />
-            </button>
-
-            {/* RIGHT (ڕاست) */}
-            <button
-              onClick={() => handlePan(1, 0)}
-              className="w-9 h-9 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 hover:text-amber-300 flex items-center justify-center transition active:scale-90"
-              title="ڕاست (East / Right)"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* DOWN (خوارێ) */}
-          <button
-            onClick={() => handlePan(0, 1)}
-            className="w-9 h-9 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 hover:text-amber-300 flex items-center justify-center transition active:scale-90"
-            title="خوارێ (South / Down)"
-          >
-            <ChevronDown className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Full Continent Board Overview Button */}
-        <button
-          onClick={handleFullMapOverview}
-          className="px-3 py-2 rounded-xl bg-purple-950/90 hover:bg-purple-900 border border-purple-500/60 text-purple-200 text-[11px] font-bold flex flex-col items-center gap-1 shadow-2xl transition hover:scale-105 active:scale-95"
-          title="بینینی تەواوی ماپ لە ئاسمانەوە"
-        >
-          <Eye className="w-4 h-4 text-purple-300" />
-          <span>تەواوی ماپ</span>
-        </button>
       </div>
 
       {/* Target Destination notification banner at top */}

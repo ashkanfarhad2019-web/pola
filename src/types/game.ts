@@ -3,7 +3,7 @@
  * Steel and Flesh-inspired Grand Medieval Strategy RPG
  */
 
-export type FactionId = 'valoria' | 'eisenreich' | 'saruq' | 'verdant' | 'maritia' | 'player_kingdom';
+export type FactionId = 'valoria' | 'eisenreich' | 'saruq' | 'verdant' | 'maritia' | 'frostgard' | 'player_kingdom';
 
 export interface Faction {
   id: FactionId;

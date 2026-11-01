@@ -1,5 +1,6 @@
 /**
  * World Lore, Factions, Settlements, Troops & Initial Setup
+ * Expanded to 6 great kingdoms, 20+ cities & castles, and 16 smart AI lords.
  */
 import { Faction, FactionId, GoodId, Lord, RealmPolicy, Settlement, SettlementMarketItem, TradeGood, TroopType } from '../types/game';
 
@@ -115,7 +116,6 @@ export const TRADE_GOODS: Record<GoodId, TradeGood> = {
 };
 
 export const TROOP_CATALOG: Record<string, TroopType> = {
-  // Generic / Valoria
   recruit: {
     id: 'recruit',
     name: 'Peasant Recruit',
@@ -278,6 +278,21 @@ export const TROOP_CATALOG: Record<string, TroopType> = {
     armor: 24,
     speed: 5.8,
   },
+  frost_berserker: {
+    id: 'frost_berserker',
+    name: 'Frostgard Berserker',
+    nameKu: 'جەنگاوەری بەفرینی باکوور',
+    tier: 4,
+    type: 'infantry',
+    factionId: 'frostgard',
+    recruitCost: 160,
+    dailyWage: 14,
+    maxHp: 185,
+    meleeAttack: 60,
+    rangedAttack: 0,
+    armor: 42,
+    speed: 3.4,
+  },
 };
 
 export const INITIAL_FACTIONS: Record<FactionId, Faction> = {
@@ -291,13 +306,14 @@ export const INITIAL_FACTIONS: Record<FactionId, Faction> = {
     bannerIcon: 'Crown',
     description: 'A proud and wealthy feudal monarchy with unmatched heavy cavalry and fertile agricultural river basins.',
     descriptionKu: 'سەڵتەنەتێکی دەوڵەمەند بە زەوی کشتوکاڵی بەپیت و سوارچاکی بەهێز کە بەرگری لە دابونەریتی کۆن دەکات.',
-    militaryPower: 820,
+    militaryPower: 920,
     treasury: 14500,
     relations: {
-      eisenreich: -40, // Rivalry
-      saruq: 15, // Trade partner
-      verdant: 20, // Friendly
+      eisenreich: -40,
+      saruq: 15,
+      verdant: 20,
       maritia: 10,
+      frostgard: -15,
       player_kingdom: 0,
     },
     treaties: [
@@ -316,13 +332,14 @@ export const INITIAL_FACTIONS: Record<FactionId, Faction> = {
     bannerIcon: 'ShieldAlert',
     description: 'Disciplined mountain warriors who control deep iron mines and field massive armored infantry phalanxes.',
     descriptionKu: 'دەسەڵاتێکی سەربازی لە ناو شاخەکان کە خاوەنی کانە دەوڵەمەندەکانی ئاسن و پیادەی بەهێزە.',
-    militaryPower: 950,
-    treasury: 11000,
+    militaryPower: 1100,
+    treasury: 12000,
     relations: {
       valoria: -40,
       saruq: -20,
-      verdant: -50, // Border war
+      verdant: -50,
       maritia: -10,
+      frostgard: 10,
       player_kingdom: 0,
     },
     treaties: [
@@ -341,13 +358,14 @@ export const INITIAL_FACTIONS: Record<FactionId, Faction> = {
     bannerIcon: 'Sun',
     description: 'Masters of the desert oasis trade routes, renowned for swift horse archers, silk weaving, and exotic spices.',
     descriptionKu: 'دەسەڵاتدارانی ڕێگای ئاوریشم و بیابان کە بە کەوانداری سوارە و بازرگانی بەهارات ناوبانگیان هەیە.',
-    militaryPower: 790,
-    treasury: 18000,
+    militaryPower: 860,
+    treasury: 19500,
     relations: {
       valoria: 15,
       eisenreich: -20,
       verdant: 0,
-      maritia: 30, // Big trade ally
+      maritia: 30,
+      frostgard: -25,
       player_kingdom: 0,
     },
     treaties: [
@@ -367,13 +385,14 @@ export const INITIAL_FACTIONS: Record<FactionId, Faction> = {
     bannerIcon: 'Trees',
     description: 'Fiercely independent forest lords and trappers who fight with longbows and heavy two-handed axes.',
     descriptionKu: 'تیرە سەربەخۆکانی دارستانە چڕەکان کە داری ڕەق و چەرم دابین دەکەن و لە تەنگەبەرەکاندا شەڕ دەکەن.',
-    militaryPower: 680,
-    treasury: 8500,
+    militaryPower: 750,
+    treasury: 9500,
     relations: {
       valoria: 20,
       eisenreich: -50,
       saruq: 0,
       maritia: 25,
+      frostgard: -10,
       player_kingdom: 0,
     },
     treaties: [
@@ -392,13 +411,14 @@ export const INITIAL_FACTIONS: Record<FactionId, Faction> = {
     bannerIcon: 'Anchor',
     description: 'A wealthy maritime league governed by patrician merchant families, deploying elite mercenary regiments.',
     descriptionKu: 'کۆماری بازرگانی سەر کەنار دەریا کە خاوەنی کەشتیگەل و سوپای بەکرێگیراوی پرۆفیشناڵە.',
-    militaryPower: 740,
-    treasury: 22000,
+    militaryPower: 810,
+    treasury: 24000,
     relations: {
       valoria: 10,
       eisenreich: -10,
       saruq: 30,
       verdant: 25,
+      frostgard: 0,
       player_kingdom: 0,
     },
     treaties: [
@@ -406,6 +426,30 @@ export const INITIAL_FACTIONS: Record<FactionId, Faction> = {
     ],
     specialty: 'Maritime Salt, Wine, Mercenaries & Vast Banking',
     specialtyKu: 'خوێ، شەراب، قەرزی بانکی و سوپای بەکرێگیراو',
+  },
+  frostgard: {
+    id: 'frostgard',
+    name: 'High Kingdom of Frostgard',
+    nameKu: 'میرنشینی بەفرینی باکوور (فرۆستگارد)',
+    ruler: 'King Ragnar Coldhand',
+    rulerKu: 'پاشا ڕاگنار دەستبەستەڵەک',
+    color: '#6366f1', // Frost indigo
+    bannerIcon: 'Shield',
+    description: 'Hardened northern warriors who rule the snow-capped mountain fortresses, fielding relentless berserkers.',
+    descriptionKu: 'جەنگاوەرانی ناوچە سەهۆڵینەکانی باکوور کە بە بەرگری سەخت و تەوری قورس شەڕ دەکەن.',
+    militaryPower: 890,
+    treasury: 11500,
+    relations: {
+      valoria: -15,
+      eisenreich: 10,
+      saruq: -25,
+      verdant: -10,
+      maritia: 0,
+      player_kingdom: 0,
+    },
+    treaties: [],
+    specialty: 'Furs, Heavy Axes & Mountain Bastions',
+    specialtyKu: 'پێستەی دەگمەن، تەوری قورس و قەڵای سەهۆڵین',
   },
   player_kingdom: {
     id: 'player_kingdom',
@@ -417,14 +461,15 @@ export const INITIAL_FACTIONS: Record<FactionId, Faction> = {
     bannerIcon: 'Sword',
     description: 'A nascent realm forged by your own steel, diplomacy, and cunning commercial acumen.',
     descriptionKu: 'شانشینە تازەکەت کە بە حەقی شمشێر، بازرگانی دادپەروەرانە و سیاسەتی زیرەکانە بونیاتی دەنێیت.',
-    militaryPower: 100,
-    treasury: 1000,
+    militaryPower: 120,
+    treasury: 1200,
     relations: {
       valoria: 0,
       eisenreich: 0,
       saruq: 0,
       verdant: 0,
       maritia: 0,
+      frostgard: 0,
     },
     treaties: [],
     specialty: 'Player Mastery & Sovereign Edicts',
@@ -483,7 +528,6 @@ export const INITIAL_POLICIES: RealmPolicy[] = [
   },
 ];
 
-// Helper to create market inventories with realistic supply & demand curves
 function generateMarket(specialties: Partial<Record<GoodId, { prod: number; stock: number; baseMod: number }>>): Record<GoodId, SettlementMarketItem> {
   const result: Partial<Record<GoodId, SettlementMarketItem>> = {};
   
@@ -495,10 +539,9 @@ function generateMarket(specialties: Partial<Record<GoodId, { prod: number; stoc
     const initialStock = spec ? spec.stock : 25 + Math.floor(Math.random() * 20);
     const mod = spec ? spec.baseMod : 1.0;
 
-    // Price formula: If stock is high, price is low; if stock is low, price is high!
     const scarcityMultiplier = Math.max(0.5, Math.min(2.5, 35 / Math.max(initialStock, 5)));
     const buyPrice = Math.round(item.basePrice * mod * scarcityMultiplier);
-    const sellPrice = Math.max(1, Math.round(buyPrice * 0.78)); // 22% spread for realistic trading
+    const sellPrice = Math.max(1, Math.round(buyPrice * 0.78));
 
     result[goodKey] = {
       goodId: goodKey,
@@ -514,7 +557,7 @@ function generateMarket(specialties: Partial<Record<GoodId, { prod: number; stoc
 }
 
 export const INITIAL_SETTLEMENTS: Record<string, Settlement> = {
-  // Valoria
+  // === VALORIA (West/Central) ===
   val_capital: {
     id: 'val_capital',
     name: 'Sunspire City',
@@ -534,11 +577,11 @@ export const INITIAL_SETTLEMENTS: Record<string, Settlement> = {
       { id: 'ws_val_1', name: 'Royal Brewery', nameKu: 'مەیخانەی شاهانە', type: 'brewery', ownerId: 'lord_alden', dailyProfit: 120, cost: 4500 }
     ],
     market: generateMarket({
-      grain: { prod: 20, stock: 95, baseMod: 0.6 }, // Extremely cheap grain!
+      grain: { prod: 20, stock: 95, baseMod: 0.6 },
       meat: { prod: 10, stock: 50, baseMod: 0.8 },
       wine: { prod: 12, stock: 65, baseMod: 0.7 },
-      iron: { prod: 1, stock: 12, baseMod: 1.4 }, // Lacks iron!
-      spices: { prod: 0, stock: 5, baseMod: 2.0 }, // Wants spices!
+      iron: { prod: 1, stock: 12, baseMod: 1.4 },
+      spices: { prod: 0, stock: 5, baseMod: 2.0 },
     }),
     garrison: [
       { troopId: 'heavy_swordsman', count: 65, wounded: 0 },
@@ -572,8 +615,33 @@ export const INITIAL_SETTLEMENTS: Record<string, Settlement> = {
       { troopId: 'militia_archer', count: 40, wounded: 0 },
     ],
   },
+  val_castle_2: {
+    id: 'val_castle_2',
+    name: 'Kingsford Citadel',
+    nameKu: 'قەڵای دەریاچەی پاشا',
+    type: 'castle',
+    factionId: 'valoria',
+    lordOwnerId: 'lord_alden',
+    x: -42,
+    z: -30,
+    population: 3600,
+    prosperity: 58,
+    defenseLevel: 4,
+    foodReservesDays: 60,
+    publicOrder: 78,
+    taxRate: 'normal',
+    workshops: [],
+    market: generateMarket({
+      grain: { prod: 10, stock: 55, baseMod: 0.7 },
+      meat: { prod: 6, stock: 30, baseMod: 0.9 },
+    }),
+    garrison: [
+      { troopId: 'heavy_swordsman', count: 35, wounded: 0 },
+      { troopId: 'militia_archer', count: 30, wounded: 0 },
+    ],
+  },
 
-  // Eisenreich
+  // === EISENREICH (North-East Mountains) ===
   eis_capital: {
     id: 'eis_capital',
     name: 'Ironcrag Stronghold',
@@ -593,10 +661,10 @@ export const INITIAL_SETTLEMENTS: Record<string, Settlement> = {
       { id: 'ws_eis_1', name: 'Master Iron Smelter', nameKu: 'کارگەی توانەوەی ئاسن', type: 'iron_forge', ownerId: 'lord_varek', dailyProfit: 160, cost: 5200 }
     ],
     market: generateMarket({
-      iron: { prod: 28, stock: 120, baseMod: 0.5 }, // Abundant iron!
+      iron: { prod: 28, stock: 120, baseMod: 0.5 },
       weapons: { prod: 18, stock: 70, baseMod: 0.65 },
       armor: { prod: 12, stock: 55, baseMod: 0.7 },
-      grain: { prod: 3, stock: 15, baseMod: 1.8 }, // Starving for food!
+      grain: { prod: 3, stock: 15, baseMod: 1.8 },
       meat: { prod: 2, stock: 12, baseMod: 1.7 },
       silk: { prod: 0, stock: 4, baseMod: 2.2 },
     }),
@@ -632,8 +700,59 @@ export const INITIAL_SETTLEMENTS: Record<string, Settlement> = {
       { troopId: 'heavy_swordsman', count: 30, wounded: 0 },
     ],
   },
+  eis_castle_2: {
+    id: 'eis_castle_2',
+    name: 'Blackgate Fortress',
+    nameKu: 'قەڵای دەروازەی ڕەش',
+    type: 'castle',
+    factionId: 'eisenreich',
+    lordOwnerId: 'lord_varek',
+    x: 32,
+    z: -52,
+    population: 3900,
+    prosperity: 66,
+    defenseLevel: 5,
+    foodReservesDays: 65,
+    publicOrder: 72,
+    taxRate: 'high',
+    workshops: [],
+    market: generateMarket({
+      weapons: { prod: 10, stock: 45, baseMod: 0.7 },
+      iron: { prod: 15, stock: 65, baseMod: 0.6 },
+    }),
+    garrison: [
+      { troopId: 'royal_guard', count: 40, wounded: 0 },
+      { troopId: 'footman', count: 50, wounded: 0 },
+    ],
+  },
+  eis_town_2: {
+    id: 'eis_town_2',
+    name: 'Steelhaven Foundry',
+    nameKu: 'شاری پۆڵاسازی ستیلهاڤن',
+    type: 'town',
+    factionId: 'eisenreich',
+    lordOwnerId: 'lord_karl',
+    x: 60,
+    z: -38,
+    population: 8900,
+    prosperity: 75,
+    defenseLevel: 4,
+    foodReservesDays: 45,
+    publicOrder: 74,
+    taxRate: 'normal',
+    workshops: [],
+    market: generateMarket({
+      armor: { prod: 15, stock: 60, baseMod: 0.6 },
+      weapons: { prod: 14, stock: 55, baseMod: 0.65 },
+      iron: { prod: 20, stock: 85, baseMod: 0.55 },
+    }),
+    garrison: [
+      { troopId: 'heavy_swordsman', count: 50, wounded: 0 },
+      { troopId: 'footman', count: 45, wounded: 0 },
+    ],
+  },
 
-  // Saruq
+  // === SARUQ (South Desert) ===
   sar_capital: {
     id: 'sar_capital',
     name: 'Sultanate Oasis (Al-Zahra)',
@@ -653,10 +772,10 @@ export const INITIAL_SETTLEMENTS: Record<string, Settlement> = {
       { id: 'ws_sar_1', name: 'Royal Silk Weavery', nameKu: 'کارگەی ئاوریشمی شاهانە', type: 'weaver', ownerId: 'lord_tariq', dailyProfit: 190, cost: 6000 }
     ],
     market: generateMarket({
-      spices: { prod: 25, stock: 110, baseMod: 0.5 }, // Ultra cheap spices & silk!
+      spices: { prod: 25, stock: 110, baseMod: 0.5 },
       silk: { prod: 20, stock: 85, baseMod: 0.55 },
       salt: { prod: 15, stock: 70, baseMod: 0.7 },
-      timber: { prod: 1, stock: 8, baseMod: 2.1 }, // Desperately lacks timber!
+      timber: { prod: 1, stock: 8, baseMod: 2.1 },
       iron: { prod: 2, stock: 14, baseMod: 1.6 },
     }),
     garrison: [
@@ -691,8 +810,59 @@ export const INITIAL_SETTLEMENTS: Record<string, Settlement> = {
       { troopId: 'militia_archer', count: 35, wounded: 0 },
     ],
   },
+  sar_castle_2: {
+    id: 'sar_castle_2',
+    name: 'Mirage Bastion',
+    nameKu: 'قەڵای ترووسکەی بیابان',
+    type: 'castle',
+    factionId: 'saruq',
+    lordOwnerId: 'lord_malik',
+    x: 42,
+    z: 55,
+    population: 3100,
+    prosperity: 62,
+    defenseLevel: 4,
+    foodReservesDays: 60,
+    publicOrder: 82,
+    taxRate: 'normal',
+    workshops: [],
+    market: generateMarket({
+      spices: { prod: 15, stock: 65, baseMod: 0.55 },
+      silk: { prod: 10, stock: 45, baseMod: 0.6 },
+    }),
+    garrison: [
+      { troopId: 'desert_raider', count: 35, wounded: 0 },
+      { troopId: 'royal_marksman', count: 25, wounded: 0 },
+    ],
+  },
+  sar_town_2: {
+    id: 'sar_town_2',
+    name: 'Bazaar of Palmyra',
+    nameKu: 'شاری بازاڕی تەدمور',
+    type: 'town',
+    factionId: 'saruq',
+    lordOwnerId: 'lord_tariq',
+    x: 35,
+    z: 32,
+    population: 9800,
+    prosperity: 82,
+    defenseLevel: 3,
+    foodReservesDays: 45,
+    publicOrder: 84,
+    taxRate: 'normal',
+    workshops: [],
+    market: generateMarket({
+      spices: { prod: 18, stock: 75, baseMod: 0.6 },
+      silk: { prod: 15, stock: 65, baseMod: 0.65 },
+      wool: { prod: 10, stock: 50, baseMod: 0.8 },
+    }),
+    garrison: [
+      { troopId: 'desert_raider', count: 45, wounded: 0 },
+      { troopId: 'footman', count: 40, wounded: 0 },
+    ],
+  },
 
-  // Verdant
+  // === VERDANT VALE (West Forest) ===
   ver_capital: {
     id: 'ver_capital',
     name: 'Ravenshadow Glen',
@@ -712,10 +882,10 @@ export const INITIAL_SETTLEMENTS: Record<string, Settlement> = {
       { id: 'ws_ver_1', name: 'Highland Tannery', nameKu: 'کارگەی خۆشکردنی پێستە', type: 'tannery', ownerId: 'lord_torstein', dailyProfit: 110, cost: 4200 }
     ],
     market: generateMarket({
-      timber: { prod: 30, stock: 130, baseMod: 0.45 }, // Abundant wood & hides!
+      timber: { prod: 30, stock: 130, baseMod: 0.45 },
       meat: { prod: 18, stock: 75, baseMod: 0.6 },
       wool: { prod: 15, stock: 65, baseMod: 0.7 },
-      weapons: { prod: 3, stock: 15, baseMod: 1.7 }, // Needs swords/armor!
+      weapons: { prod: 3, stock: 15, baseMod: 1.7 },
       armor: { prod: 1, stock: 8, baseMod: 2.0 },
       wine: { prod: 2, stock: 12, baseMod: 1.6 },
     }),
@@ -725,8 +895,58 @@ export const INITIAL_SETTLEMENTS: Record<string, Settlement> = {
       { troopId: 'recruit', count: 40, wounded: 0 },
     ],
   },
+  ver_castle_1: {
+    id: 'ver_castle_1',
+    name: 'Wolfpine Keep',
+    nameKu: 'قەڵای سنەوبەری گورگ',
+    type: 'castle',
+    factionId: 'verdant',
+    lordOwnerId: 'lord_torstein',
+    x: -62,
+    z: 32,
+    population: 3400,
+    prosperity: 64,
+    defenseLevel: 4,
+    foodReservesDays: 65,
+    publicOrder: 85,
+    taxRate: 'low',
+    workshops: [],
+    market: generateMarket({
+      timber: { prod: 20, stock: 80, baseMod: 0.5 },
+      meat: { prod: 12, stock: 50, baseMod: 0.7 },
+    }),
+    garrison: [
+      { troopId: 'marksman', count: 45, wounded: 0 },
+      { troopId: 'footman', count: 35, wounded: 0 },
+    ],
+  },
+  ver_castle_2: {
+    id: 'ver_castle_2',
+    name: 'Elderwood Bastion',
+    nameKu: 'قەڵای دارستانی بەساڵاچوو',
+    type: 'castle',
+    factionId: 'verdant',
+    lordOwnerId: 'lord_torstein',
+    x: -40,
+    z: 34,
+    population: 3100,
+    prosperity: 60,
+    defenseLevel: 3,
+    foodReservesDays: 55,
+    publicOrder: 80,
+    taxRate: 'low',
+    workshops: [],
+    market: generateMarket({
+      timber: { prod: 18, stock: 75, baseMod: 0.5 },
+      wool: { prod: 12, stock: 55, baseMod: 0.75 },
+    }),
+    garrison: [
+      { troopId: 'footman', count: 40, wounded: 0 },
+      { troopId: 'militia_archer', count: 35, wounded: 0 },
+    ],
+  },
 
-  // Maritia (Port)
+  // === MARITIA (Central/Coast) ===
   mar_capital: {
     id: 'mar_capital',
     name: 'Port of Maritia',
@@ -759,9 +979,144 @@ export const INITIAL_SETTLEMENTS: Record<string, Settlement> = {
       { troopId: 'marksman', count: 40, wounded: 0 },
     ],
   },
+  mar_castle_1: {
+    id: 'mar_castle_1',
+    name: 'Coral Reach Citadel',
+    nameKu: 'قەڵای مەرجانی دەریایی',
+    type: 'castle',
+    factionId: 'maritia',
+    lordOwnerId: 'lord_bellini',
+    x: -20,
+    z: 18,
+    population: 3900,
+    prosperity: 72,
+    defenseLevel: 4,
+    foodReservesDays: 60,
+    publicOrder: 85,
+    taxRate: 'normal',
+    workshops: [],
+    market: generateMarket({
+      salt: { prod: 15, stock: 65, baseMod: 0.6 },
+      wine: { prod: 12, stock: 55, baseMod: 0.7 },
+    }),
+    garrison: [
+      { troopId: 'footman', count: 50, wounded: 0 },
+      { troopId: 'militia_archer', count: 35, wounded: 0 },
+    ],
+  },
+  mar_castle_2: {
+    id: 'mar_castle_2',
+    name: 'Golden Anchor Keep',
+    nameKu: 'قەڵای لەنگەری زێڕین',
+    type: 'castle',
+    factionId: 'maritia',
+    lordOwnerId: 'lord_bellini',
+    x: 8,
+    z: 12,
+    population: 3500,
+    prosperity: 68,
+    defenseLevel: 4,
+    foodReservesDays: 55,
+    publicOrder: 84,
+    taxRate: 'normal',
+    workshops: [],
+    market: generateMarket({
+      wine: { prod: 14, stock: 60, baseMod: 0.65 },
+      salt: { prod: 12, stock: 50, baseMod: 0.7 },
+    }),
+    garrison: [
+      { troopId: 'heavy_swordsman', count: 40, wounded: 0 },
+      { troopId: 'footman', count: 40, wounded: 0 },
+    ],
+  },
+
+  // === FROSTGARD (Far North Mountains & Glaciers) ===
+  frost_capital: {
+    id: 'frost_capital',
+    name: 'Frostgard Citadel',
+    nameKu: 'قەڵای بەفری فرۆستگارد (باکوور)',
+    type: 'town',
+    factionId: 'frostgard',
+    lordOwnerId: 'lord_ragnar',
+    x: 5,
+    z: -62,
+    population: 11800,
+    prosperity: 76,
+    defenseLevel: 5,
+    foodReservesDays: 55,
+    publicOrder: 80,
+    taxRate: 'normal',
+    workshops: [
+      { id: 'ws_frost_1', name: 'Glacier Furrier', nameKu: 'کارگەی پێستەی بەفرین', type: 'tannery', ownerId: 'lord_ragnar', dailyProfit: 140, cost: 4800 }
+    ],
+    market: generateMarket({
+      meat: { prod: 24, stock: 95, baseMod: 0.55 },
+      timber: { prod: 20, stock: 85, baseMod: 0.6 },
+      wool: { prod: 18, stock: 75, baseMod: 0.65 },
+      weapons: { prod: 10, stock: 45, baseMod: 0.8 },
+      grain: { prod: 2, stock: 12, baseMod: 1.85 },
+      wine: { prod: 1, stock: 8, baseMod: 2.1 },
+    }),
+    garrison: [
+      { troopId: 'frost_berserker', count: 55, wounded: 0 },
+      { troopId: 'heavy_swordsman', count: 50, wounded: 0 },
+      { troopId: 'marksman', count: 35, wounded: 0 },
+    ],
+  },
+  frost_castle_1: {
+    id: 'frost_castle_1',
+    name: 'Blizzard Rock Keep',
+    nameKu: 'قەڵای بەردی کڕێوە',
+    type: 'castle',
+    factionId: 'frostgard',
+    lordOwnerId: 'lord_ragnar',
+    x: 22,
+    z: -68,
+    population: 3200,
+    prosperity: 60,
+    defenseLevel: 5,
+    foodReservesDays: 70,
+    publicOrder: 82,
+    taxRate: 'normal',
+    workshops: [],
+    market: generateMarket({
+      meat: { prod: 15, stock: 65, baseMod: 0.6 },
+      timber: { prod: 12, stock: 55, baseMod: 0.7 },
+    }),
+    garrison: [
+      { troopId: 'frost_berserker', count: 40, wounded: 0 },
+      { troopId: 'footman', count: 35, wounded: 0 },
+    ],
+  },
+  frost_castle_2: {
+    id: 'frost_castle_2',
+    name: 'Icecrag Bastion',
+    nameKu: 'قەڵای بەستەڵەکی شاخاوی',
+    type: 'castle',
+    factionId: 'frostgard',
+    lordOwnerId: 'lord_ragnar',
+    x: -20,
+    z: -65,
+    population: 2900,
+    prosperity: 58,
+    defenseLevel: 4,
+    foodReservesDays: 60,
+    publicOrder: 80,
+    taxRate: 'normal',
+    workshops: [],
+    market: generateMarket({
+      meat: { prod: 12, stock: 50, baseMod: 0.65 },
+      wool: { prod: 10, stock: 45, baseMod: 0.75 },
+    }),
+    garrison: [
+      { troopId: 'frost_berserker', count: 35, wounded: 0 },
+      { troopId: 'militia_archer', count: 30, wounded: 0 },
+    ],
+  },
 };
 
 export const INITIAL_LORDS: Record<string, Lord> = {
+  // Valoria
   lord_alden: {
     id: 'lord_alden',
     name: 'King Alden IV',
@@ -773,7 +1128,7 @@ export const INITIAL_LORDS: Record<string, Lord> = {
     wealth: 8500,
     prestige: 92,
     relationWithPlayer: 10,
-    fiefIds: ['val_capital'],
+    fiefIds: ['val_capital', 'val_castle_2'],
     troops: [
       { troopId: 'paladin_knight', count: 35, wounded: 0 },
       { troopId: 'heavy_swordsman', count: 50, wounded: 0 },
@@ -798,6 +1153,8 @@ export const INITIAL_LORDS: Record<string, Lord> = {
       { troopId: 'militia_archer', count: 25, wounded: 0 },
     ],
   },
+
+  // Eisenreich
   lord_varek: {
     id: 'lord_varek',
     name: 'Chancellor Varek',
@@ -809,7 +1166,7 @@ export const INITIAL_LORDS: Record<string, Lord> = {
     wealth: 9200,
     prestige: 95,
     relationWithPlayer: -5,
-    fiefIds: ['eis_capital'],
+    fiefIds: ['eis_capital', 'eis_castle_2'],
     troops: [
       { troopId: 'royal_guard', count: 45, wounded: 0 },
       { troopId: 'heavy_swordsman', count: 65, wounded: 0 },
@@ -827,12 +1184,14 @@ export const INITIAL_LORDS: Record<string, Lord> = {
     wealth: 5600,
     prestige: 68,
     relationWithPlayer: 0,
-    fiefIds: ['eis_mine_castle'],
+    fiefIds: ['eis_mine_castle', 'eis_town_2'],
     troops: [
       { troopId: 'heavy_swordsman', count: 40, wounded: 0 },
       { troopId: 'footman', count: 35, wounded: 0 },
     ],
   },
+
+  // Saruq
   lord_tariq: {
     id: 'lord_tariq',
     name: 'Sultan Tariq Al-Mansoor',
@@ -844,7 +1203,7 @@ export const INITIAL_LORDS: Record<string, Lord> = {
     wealth: 12000,
     prestige: 90,
     relationWithPlayer: 15,
-    fiefIds: ['sar_capital'],
+    fiefIds: ['sar_capital', 'sar_town_2'],
     troops: [
       { troopId: 'desert_raider', count: 50, wounded: 0 },
       { troopId: 'royal_marksman', count: 45, wounded: 0 },
@@ -862,12 +1221,14 @@ export const INITIAL_LORDS: Record<string, Lord> = {
     wealth: 4800,
     prestige: 72,
     relationWithPlayer: 5,
-    fiefIds: ['sar_caravan_post'],
+    fiefIds: ['sar_caravan_post', 'sar_castle_2'],
     troops: [
       { troopId: 'desert_raider', count: 45, wounded: 0 },
       { troopId: 'militia_archer', count: 30, wounded: 0 },
     ],
   },
+
+  // Verdant
   lord_torstein: {
     id: 'lord_torstein',
     name: 'Jarl Torstein Ironbrow',
@@ -879,13 +1240,15 @@ export const INITIAL_LORDS: Record<string, Lord> = {
     wealth: 5100,
     prestige: 80,
     relationWithPlayer: 0,
-    fiefIds: ['ver_capital'],
+    fiefIds: ['ver_capital', 'ver_castle_1', 'ver_castle_2'],
     troops: [
       { troopId: 'heavy_swordsman', count: 55, wounded: 0 },
       { troopId: 'marksman', count: 45, wounded: 0 },
       { troopId: 'footman', count: 40, wounded: 0 },
     ],
   },
+
+  // Maritia
   lord_bellini: {
     id: 'lord_bellini',
     name: 'Grand Doge Bellini',
@@ -897,11 +1260,31 @@ export const INITIAL_LORDS: Record<string, Lord> = {
     wealth: 15500,
     prestige: 88,
     relationWithPlayer: 10,
-    fiefIds: ['mar_capital'],
+    fiefIds: ['mar_capital', 'mar_castle_1', 'mar_castle_2'],
     troops: [
       { troopId: 'heavy_swordsman', count: 40, wounded: 0 },
       { troopId: 'marksman', count: 40, wounded: 0 },
       { troopId: 'horseman', count: 30, wounded: 0 },
+    ],
+  },
+
+  // Frostgard
+  lord_ragnar: {
+    id: 'lord_ragnar',
+    name: 'King Ragnar Coldhand',
+    nameKu: 'پاشا ڕاگنار دەستبەستەڵەک',
+    title: 'High Jarl of the Northern Wastes',
+    titleKu: 'پاشای پایەبەرزی سەهۆڵبەندان',
+    factionId: 'frostgard',
+    personality: 'martial',
+    wealth: 7500,
+    prestige: 86,
+    relationWithPlayer: 0,
+    fiefIds: ['frost_capital', 'frost_castle_1', 'frost_castle_2'],
+    troops: [
+      { troopId: 'frost_berserker', count: 50, wounded: 0 },
+      { troopId: 'heavy_swordsman', count: 40, wounded: 0 },
+      { troopId: 'marksman', count: 35, wounded: 0 },
     ],
   },
 };

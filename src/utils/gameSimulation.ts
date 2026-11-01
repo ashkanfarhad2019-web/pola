@@ -161,6 +161,115 @@ export function createInitialGameState(): GameState {
       statusText: 'Stalking trade highways',
       statusTextKu: 'لە بۆسەدایە بۆ کاروانەکان',
     },
+    party_ragnar: {
+      id: 'party_ragnar',
+      name: 'King Ragnar Frost Host',
+      nameKu: 'لەشکری بەفرینی پاشا ڕاگنار',
+      type: 'lord',
+      factionId: 'frostgard',
+      leaderLordId: 'lord_ragnar',
+      x: 8,
+      z: -58,
+      targetX: -20,
+      targetZ: -65,
+      speed: 3.6,
+      bannerColor: '#6366f1',
+      dinars: 8500,
+      troops: [
+        { troopId: 'frost_berserker', count: 35, wounded: 0 },
+        { troopId: 'heavy_swordsman', count: 30, wounded: 0 },
+        { troopId: 'marksman', count: 25, wounded: 0 },
+      ],
+      cargo: { meat: 30, timber: 20 },
+      statusText: 'Patrolling northern glacier passes',
+      statusTextKu: 'چاودێری سنووری شاخە بەفرینەکان دەکات',
+    },
+    party_torstein: {
+      id: 'party_torstein',
+      name: 'Jarl Torstein Forest Host',
+      nameKu: 'لەشکری دارستانی تۆرستاین',
+      type: 'lord',
+      factionId: 'verdant',
+      leaderLordId: 'lord_torstein',
+      x: -48,
+      z: 18,
+      targetX: -62,
+      targetZ: 32,
+      speed: 3.8,
+      bannerColor: '#16a34a',
+      dinars: 7200,
+      troops: [
+        { troopId: 'heavy_swordsman', count: 40, wounded: 0 },
+        { troopId: 'marksman', count: 45, wounded: 0 },
+      ],
+      cargo: { timber: 40, meat: 25 },
+      statusText: 'Guarding highland lumber valleys',
+      statusTextKu: 'پارێزگاری لە دۆڵ و دارستانەکانی دەکات',
+    },
+    party_bellini: {
+      id: 'party_bellini',
+      name: 'Doge Bellini Maritime Fleet Host',
+      nameKu: 'لەشکری بازرگانی دۆج بێلینی',
+      type: 'lord',
+      factionId: 'maritia',
+      leaderLordId: 'lord_bellini',
+      x: -8,
+      z: 8,
+      targetX: 8,
+      targetZ: 12,
+      speed: 4.0,
+      bannerColor: '#06b6d4',
+      dinars: 16000,
+      troops: [
+        { troopId: 'heavy_swordsman', count: 35, wounded: 0 },
+        { troopId: 'marksman', count: 35, wounded: 0 },
+        { troopId: 'horseman', count: 25, wounded: 0 },
+      ],
+      cargo: { wine: 30, salt: 30 },
+      statusText: 'Securing coastal maritime trade',
+      statusTextKu: 'پارێزگاری لە ڕێگای کەشتیگەلی کەناراو دەکات',
+    },
+    caravan_3: {
+      id: 'caravan_3',
+      name: 'Southern Oasis Camel Caravan',
+      nameKu: 'کاروانی وشترەکانی بیابانی سارۆخ',
+      type: 'caravan',
+      factionId: 'saruq',
+      x: 25,
+      z: 35,
+      targetX: -50,
+      targetZ: 15,
+      targetSettlementId: 'ver_capital',
+      speed: 3.9,
+      bannerColor: '#f59e0b',
+      dinars: 4200,
+      troops: [
+        { troopId: 'desert_raider', count: 20, wounded: 0 },
+      ],
+      cargo: { silk: 25, spices: 30 },
+      statusText: 'Transporting luxury spices to forest clans',
+      statusTextKu: 'بەهارات و ئاوریشم بەرەو دۆڵی سەوز دەبات',
+    },
+    bandits_2: {
+      id: 'bandits_2',
+      name: 'Desert Nomad Outlaws',
+      nameKu: 'ڕێگرانی کۆچەری بیابان',
+      type: 'bandit',
+      factionId: 'saruq',
+      x: 10,
+      z: 48,
+      targetX: 30,
+      targetZ: 40,
+      speed: 4.4,
+      bannerColor: '#78350f',
+      dinars: 500,
+      troops: [
+        { troopId: 'desert_raider', count: 25, wounded: 0 },
+      ],
+      cargo: { salt: 15, spices: 10 },
+      statusText: 'Hunting spice trade convoys',
+      statusTextKu: 'بۆسەی بۆ کاروانەکانی بیابان داناوە',
+    },
   };
 
   return {
@@ -255,12 +364,46 @@ export function simulateTick(state: GameState, dtSeconds: number): GameState {
           p.targetX = undefined;
           p.targetZ = undefined;
           next.targetDestinationName = undefined;
-        } else if (p.type === 'caravan' || p.type === 'lord' || p.type === 'patrol') {
+        } else if (p.type === 'lord') {
+          // Smart AI Lord logic:
+          // 1. If troops low (< 45), return to faction settlement to reinforce
+          const totalTroops = p.troops.reduce((a, b) => a + b.count, 0);
+          const factionSettlements = Object.values(next.settlements).filter((s) => s.factionId === p.factionId);
+          const enemySettlements = Object.values(next.settlements).filter((s) => {
+            const fac = next.factions[p.factionId];
+            return fac && fac.treaties.some((tr) => tr.type === 'war' && tr.targetFactionId === s.factionId);
+          });
+
+          if (totalTroops < 45 && factionSettlements.length > 0) {
+            // Reinforce at home
+            const home = factionSettlements[Math.floor(Math.random() * factionSettlements.length)];
+            p.targetX = home.x + (Math.random() * 3 - 1.5);
+            p.targetZ = home.z + (Math.random() * 3 - 1.5);
+            p.targetSettlementId = home.id;
+            // Recruit new soldiers
+            p.troops.push({ troopId: 'footman', count: 6, wounded: 0 });
+          } else if (enemySettlements.length > 0 && totalTroops >= 55 && Math.random() < 0.45) {
+            // March towards enemy castle/city to threaten or siege!
+            const targetEnemy = enemySettlements[Math.floor(Math.random() * enemySettlements.length)];
+            p.targetX = targetEnemy.x + (Math.random() * 4 - 2);
+            p.targetZ = targetEnemy.z + (Math.random() * 4 - 2);
+            p.targetSettlementId = targetEnemy.id;
+          } else if (factionSettlements.length > 0) {
+            // Patrol between realm settlements
+            const patrolTarget = factionSettlements[Math.floor(Math.random() * factionSettlements.length)];
+            p.targetX = patrolTarget.x + (Math.random() * 4 - 2);
+            p.targetZ = patrolTarget.z + (Math.random() * 4 - 2);
+            p.targetSettlementId = patrolTarget.id;
+          }
+        } else if (p.type === 'caravan') {
+          // Smart Caravan AI: Find towns with high demand for their goods
           const settlementList = Object.values(next.settlements);
-          const randomTarget = settlementList[Math.floor(Math.random() * settlementList.length)];
-          p.targetX = randomTarget.x + (Math.random() * 4 - 2);
-          p.targetZ = randomTarget.z + (Math.random() * 4 - 2);
-          p.targetSettlementId = randomTarget.id;
+          // Pick a different settlement from current location
+          const validDestinations = settlementList.filter((s) => Math.hypot(s.x - p.x, s.z - p.z) > 15);
+          const bestTarget = validDestinations[Math.floor(Math.random() * validDestinations.length)] || settlementList[0];
+          p.targetX = bestTarget.x + (Math.random() * 3 - 1.5);
+          p.targetZ = bestTarget.z + (Math.random() * 3 - 1.5);
+          p.targetSettlementId = bestTarget.id;
         } else if (p.type === 'bandit') {
           // Wander randomly around highways
           p.targetX = p.x + (Math.random() * 30 - 15);
