@@ -93,8 +93,8 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
 
     // 1. Scene & Camera Setup
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x11161d);
-    scene.fog = new THREE.FogExp2(0x161e28, 0.0055);
+    scene.background = new THREE.Color(0x0f1a15);
+    scene.fog = new THREE.FogExp2(0x12201a, 0.005);
 
     const camera = new THREE.PerspectiveCamera(
       45,
@@ -126,10 +126,10 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
     pmremGenerator.dispose();
 
     // 2. Lighting Rig
-    const hemiLight = new THREE.HemisphereLight(0xd4e5f7, 0x3d352e, 1.25);
+    const hemiLight = new THREE.HemisphereLight(0xdff4e6, 0x1f2e23, 1.25);
     scene.add(hemiLight);
 
-    const dirLight = new THREE.DirectionalLight(0xfff3db, 2.2);
+    const dirLight = new THREE.DirectionalLight(0xfff7e8, 2.1);
     dirLight.position.set(70, 120, 50);
     dirLight.castShadow = !isSoftwareGl;
     dirLight.shadow.mapSize.width = 2048;
@@ -144,7 +144,8 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
     dirLight.shadow.bias = -0.0004;
     scene.add(dirLight);
 
-    // 3. Terrain Generation (Procedural elevation & biome coloring)
+    // 3. Terrain Generation (Procedural elevation & Eye-Comfort Natural Green Biome)
+    // Designed specifically to avoid eye fatigue: pure organic meadows, mossy highlands, and valley greens
     const terrainSize = 260;
     const segments = 128;
     const terrainGeo = new THREE.PlaneGeometry(terrainSize, terrainSize, segments, segments);
@@ -160,28 +161,40 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
 
       let h = 0;
       if (x > 15 && z < -5) {
-        h = Math.sin(x * 0.08) * Math.cos(z * 0.08) * 10 + Math.sin(x * 0.15) * 4.5;
-        h = Math.max(0, h * 1.4);
+        h = Math.sin(x * 0.08) * Math.cos(z * 0.08) * 9.0 + Math.sin(x * 0.15) * 3.5;
+        h = Math.max(0, h * 1.3);
       } else if (z > 20) {
-        h = Math.sin(x * 0.05 + z * 0.08) * 3.2 + Math.sin(z * 0.12) * 1.6;
+        h = Math.sin(x * 0.05 + z * 0.08) * 2.8 + Math.sin(z * 0.12) * 1.3;
       } else {
-        h = Math.sin(x * 0.04) * Math.cos(z * 0.04) * 2.8;
+        h = Math.sin(x * 0.04) * Math.cos(z * 0.04) * 2.5;
       }
 
       posAttr.setY(i, h);
 
-      if (z > 25) {
-        colorHelper.setRGB(0.85, 0.72, 0.45); // Desert sand
-      } else if (z < -50) {
-        colorHelper.setRGB(0.72, 0.78, 0.85); // Frostgard snow
-      } else if (h > 6.5) {
-        colorHelper.setRGB(0.55, 0.52, 0.5); // Mountain peaks
+      // Eye-comfort organic green palette:
+      const subtleNoise = (Math.sin(x * 0.2) + Math.cos(z * 0.2)) * 0.015;
+
+      if (h > 6.0) {
+        // High ridges: soft mossy highland slate green
+        colorHelper.setRGB(0.24 + subtleNoise, 0.38 + subtleNoise, 0.24 + subtleNoise);
+      } else if (h > 2.8) {
+        // Rolling hill slopes: warm olive pasture green
+        colorHelper.setRGB(0.27 + subtleNoise, 0.45 + subtleNoise, 0.23 + subtleNoise);
       } else if (x < -20 && z > 0) {
-        colorHelper.setRGB(0.2, 0.42, 0.22); // Forest green
-      } else if (x > -15 && x < 5 && z > -5 && z < 15) {
-        colorHelper.setRGB(0.35, 0.5, 0.38); // Coast
+        // Western woodlands: rich calming forest emerald
+        colorHelper.setRGB(0.18 + subtleNoise, 0.37 + subtleNoise, 0.19 + subtleNoise);
+      } else if (x > -15 && x < 8 && z > -8 && z < 18) {
+        // Lowland rivers & central valley: lush spring meadow green
+        colorHelper.setRGB(0.23 + subtleNoise, 0.48 + subtleNoise, 0.24 + subtleNoise);
+      } else if (z > 25) {
+        // Southern meadows: warm savannah clover green (soothing, zero harsh sand glare)
+        colorHelper.setRGB(0.28 + subtleNoise, 0.46 + subtleNoise, 0.23 + subtleNoise);
+      } else if (z < -45) {
+        // Northern realm: cool alpine pine green (soothing, zero blinding snow white)
+        colorHelper.setRGB(0.21 + subtleNoise, 0.41 + subtleNoise, 0.23 + subtleNoise);
       } else {
-        colorHelper.setRGB(0.32, 0.48, 0.26); // Fertile plains
+        // Heartlands: natural, restful grass green
+        colorHelper.setRGB(0.25 + subtleNoise, 0.47 + subtleNoise, 0.23 + subtleNoise);
       }
       colors.push(colorHelper.r, colorHelper.g, colorHelper.b);
     }
@@ -191,7 +204,7 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
 
     const terrainMat = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.85,
+      roughness: 0.88,
       metalness: 0.05,
       flatShading: true,
     });
@@ -201,42 +214,56 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
 
     function getGroundHeight(x: number, z: number): number {
       if (x > 15 && z < -5) {
-        const val = Math.sin(x * 0.08) * Math.cos(z * 0.08) * 10 + Math.sin(x * 0.15) * 4.5;
-        return Math.max(0, val * 1.4);
+        const val = Math.sin(x * 0.08) * Math.cos(z * 0.08) * 9.0 + Math.sin(x * 0.15) * 3.5;
+        return Math.max(0, val * 1.3);
       }
       if (z > 20) {
-        return Math.sin(x * 0.05 + z * 0.08) * 3.2 + Math.sin(z * 0.12) * 1.6;
+        return Math.sin(x * 0.05 + z * 0.08) * 2.8 + Math.sin(z * 0.12) * 1.3;
       }
-      return Math.sin(x * 0.04) * Math.cos(z * 0.04) * 2.8;
+      return Math.sin(x * 0.04) * Math.cos(z * 0.04) * 2.5;
     }
 
     // 3D floating canvas text badge for cities/castles
-    function createSettlementBadge(s: Settlement): THREE.Sprite {
+    function createSettlementBadge(s: Settlement, isPlayerOwned: boolean): THREE.Sprite {
       const canvas = document.createElement('canvas');
       canvas.width = 256;
       canvas.height = 96;
       const ctx = canvas.getContext('2d');
       if (ctx) {
         const faction = stateRef.current.factions[s.factionId];
-        const bgColor = faction ? faction.color : '#334155';
+        const strokeColor = isPlayerOwned ? '#f59e0b' : (faction ? faction.color : '#334155');
 
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        // Dark obsidian slate background
+        ctx.fillStyle = isPlayerOwned ? 'rgba(10, 10, 12, 0.96)' : 'rgba(15, 23, 42, 0.9)';
         ctx.beginPath();
         ctx.roundRect(6, 6, 244, 84, 18);
         ctx.fill();
 
-        ctx.strokeStyle = bgColor;
-        ctx.lineWidth = 4;
+        // Border: Double-gold for captured/player castles, faction color for others
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = isPlayerOwned ? 4.5 : 3.5;
         ctx.stroke();
 
-        ctx.fillStyle = bgColor;
-        ctx.font = 'bold 24px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(s.type === 'town' ? '🏛️ ' + s.nameKu : '🏰 ' + s.nameKu, 128, 42);
+        if (isPlayerOwned) {
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
 
-        ctx.fillStyle = '#cbd5e1';
-        ctx.font = 'bold 18px sans-serif';
-        ctx.fillText(s.type === 'town' ? 'شار' : 'قەڵا', 128, 72);
+        // Title
+        ctx.fillStyle = isPlayerOwned ? '#fbbf24' : strokeColor;
+        ctx.font = 'bold 23px sans-serif';
+        ctx.textAlign = 'center';
+        const iconPrefix = isPlayerOwned ? '👑 ' : (s.type === 'town' ? '🏛️ ' : '🏰 ');
+        ctx.fillText(iconPrefix + s.nameKu, 128, 42);
+
+        // Subtitle tag
+        ctx.fillStyle = isPlayerOwned ? '#e2e8f0' : '#cbd5e1';
+        ctx.font = 'bold 17px sans-serif';
+        const tagText = isPlayerOwned 
+          ? (s.type === 'town' ? 'شاری تۆ (ڕەش)' : 'قەڵای تۆ (ڕەش)')
+          : (s.type === 'town' ? 'شار' : 'قەڵا');
+        ctx.fillText(tagText, 128, 72);
       }
 
       const texture = new THREE.CanvasTexture(canvas);
@@ -252,24 +279,46 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
       return sprite;
     }
 
-    // 4. Procedural Settlements
+    // 4. Procedural Settlements with Dynamic Black Captured Castle Styling
     const settlementGroup = new THREE.Group();
     scene.add(settlementGroup);
 
+    interface SettlementMeshRecord {
+      group: THREE.Group;
+      roofMat: THREE.MeshStandardMaterial;
+      wallMat: THREE.MeshStandardMaterial;
+      flagMat: THREE.MeshStandardMaterial;
+      badgeSprite: THREE.Sprite;
+      currentFactionId: string;
+      isPlayerOwned: boolean;
+    }
+    const settlementMeshMap = new Map<string, SettlementMeshRecord>();
+
     function buildSettlementModel(s: Settlement): THREE.Group {
       const group = new THREE.Group();
+      const isPlayerOwned = s.factionId === 'player_kingdom' || s.lordOwnerId === 'player';
       const faction = stateRef.current.factions[s.factionId];
-      const factionColor = faction ? faction.color : '#ffffff';
+      
+      // When captured by player: deep obsidian black roofs, pennants & dark noble granite walls
+      const factionColor = isPlayerOwned ? '#0c0c0e' : (faction ? faction.color : '#ffffff');
+      const wallColor = isPlayerOwned 
+        ? 0x24262b 
+        : (s.factionId === 'saruq' ? 0xd8b589 : s.factionId === 'frostgard' ? 0x94a3b8 : 0x6e7681);
 
       const wallMat = new THREE.MeshStandardMaterial({
-        color: s.factionId === 'saruq' ? 0xd8b589 : s.factionId === 'frostgard' ? 0x94a3b8 : 0x6e7681,
+        color: wallColor,
         roughness: 0.9,
         metalness: 0.1,
       });
       const roofMat = new THREE.MeshStandardMaterial({
         color: factionColor,
-        roughness: 0.6,
-        metalness: 0.2,
+        roughness: isPlayerOwned ? 0.4 : 0.6,
+        metalness: isPlayerOwned ? 0.5 : 0.2,
+      });
+      const flagMat = new THREE.MeshStandardMaterial({
+        color: factionColor,
+        roughness: 0.5,
+        metalness: isPlayerOwned ? 0.4 : 0.2,
       });
 
       if (s.type === 'town') {
@@ -308,13 +357,16 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
         group.add(keepMesh);
 
         const poleGeo = new THREE.CylinderGeometry(0.08, 0.08, 4.0);
-        const poleMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8 });
+        const poleMat = new THREE.MeshStandardMaterial({ 
+          color: isPlayerOwned ? 0xf59e0b : 0x475569, 
+          metalness: 0.9 
+        });
         const pole = new THREE.Mesh(poleGeo, poleMat);
         pole.position.set(0, 7.5, 0);
         group.add(pole);
 
         const flagGeo = new THREE.BoxGeometry(1.8, 0.9, 0.06);
-        const flag = new THREE.Mesh(flagGeo, roofMat);
+        const flag = new THREE.Mesh(flagGeo, flagMat);
         flag.position.set(0.9, 8.8, 0);
         group.add(flag);
       } else {
@@ -331,9 +383,21 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
         const flag = new THREE.Mesh(new THREE.ConeGeometry(1.6, 2.5, 4), roofMat);
         flag.position.set(0, 5.5, 0);
         group.add(flag);
+
+        // Extra flag pole with pennant on castle keep
+        const pole = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.06, 0.06, 3.2),
+          new THREE.MeshStandardMaterial({ color: isPlayerOwned ? 0xf59e0b : 0x475569, metalness: 0.9 })
+        );
+        pole.position.set(0, 7.0, 0);
+        group.add(pole);
+
+        const pennant = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.7, 0.05), flagMat);
+        pennant.position.set(0.75, 7.8, 0);
+        group.add(pennant);
       }
 
-      const badge = createSettlementBadge(s);
+      const badge = createSettlementBadge(s, isPlayerOwned);
       group.add(badge);
 
       const hitBox = new THREE.Mesh(
@@ -346,6 +410,16 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
 
       const groundY = getGroundHeight(s.x, s.z);
       group.position.set(s.x, groundY, s.z);
+
+      settlementMeshMap.set(s.id, {
+        group,
+        roofMat,
+        wallMat,
+        flagMat,
+        badgeSprite: badge,
+        currentFactionId: s.factionId,
+        isPlayerOwned,
+      });
 
       return group;
     }
@@ -363,31 +437,42 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
     function buildPartyToken(p: Party): THREE.Group {
       const group = new THREE.Group();
       const isPlayer = p.type === 'player';
-      const color = isPlayer ? 0x8b5cf6 : new THREE.Color(p.bannerColor);
+      // Player party proudly carries Jet Obsidian Black banner with gold crest
+      const color = isPlayer ? '#0c0c0e' : p.bannerColor;
 
       const bannerMat = new THREE.MeshStandardMaterial({
         color,
         roughness: 0.4,
-        metalness: 0.3,
+        metalness: isPlayer ? 0.6 : 0.3,
       });
 
       const horseBody = new THREE.Mesh(
         new THREE.BoxGeometry(0.8, 0.7, 1.8),
-        new THREE.MeshStandardMaterial({ color: 0x452b1f, roughness: 0.8 })
+        new THREE.MeshStandardMaterial({ 
+          color: isPlayer ? 0x1f1f23 : 0x452b1f, 
+          roughness: 0.8 
+        })
       );
       horseBody.position.y = 1.0;
       group.add(horseBody);
 
       const rider = new THREE.Mesh(
         new THREE.CylinderGeometry(0.35, 0.4, 1.0, 6),
-        new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7, roughness: 0.3 })
+        new THREE.MeshStandardMaterial({ 
+          color: isPlayer ? 0x1e2024 : 0x334155, 
+          metalness: 0.8, 
+          roughness: 0.25 
+        })
       );
       rider.position.set(0, 1.7, -0.1);
       group.add(rider);
 
       const pole = new THREE.Mesh(
         new THREE.CylinderGeometry(0.06, 0.06, 4.0),
-        new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.8 })
+        new THREE.MeshStandardMaterial({ 
+          color: isPlayer ? 0xf59e0b : 0xe2e8f0, 
+          metalness: 0.9 
+        })
       );
       pole.position.set(0.5, 2.5, 0.4);
       group.add(pole);
@@ -561,6 +646,33 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
       const now = performance.now();
       const dt = Math.min((now - lastTime) / 1000, 0.05);
       lastTime = now;
+
+      // Dynamically sync settlement meshes with ownership (captured castles turn Obsidian Black instantly)
+      const currentSettlements = stateRef.current.settlements;
+      Object.values(currentSettlements).forEach((s) => {
+        const rec = settlementMeshMap.get(s.id);
+        const isPlayerOwned = s.factionId === 'player_kingdom' || s.lordOwnerId === 'player';
+        if (rec && (rec.currentFactionId !== s.factionId || rec.isPlayerOwned !== isPlayerOwned)) {
+          rec.currentFactionId = s.factionId;
+          rec.isPlayerOwned = isPlayerOwned;
+          const faction = stateRef.current.factions[s.factionId];
+          const factionColor = isPlayerOwned ? '#0c0c0e' : (faction ? faction.color : '#ffffff');
+          const wallColor = isPlayerOwned 
+            ? 0x24262b 
+            : (s.factionId === 'saruq' ? 0xd8b589 : s.factionId === 'frostgard' ? 0x94a3b8 : 0x6e7681);
+
+          rec.roofMat.color.set(factionColor);
+          rec.flagMat.color.set(factionColor);
+          rec.wallMat.color.setHex(wallColor);
+
+          // Re-generate floating badge
+          rec.group.remove(rec.badgeSprite);
+          rec.badgeSprite.material.dispose();
+          const newBadge = createSettlementBadge(s, isPlayerOwned);
+          rec.badgeSprite = newBadge;
+          rec.group.add(newBadge);
+        }
+      });
 
       // Update parties
       const currentParties = stateRef.current.parties;

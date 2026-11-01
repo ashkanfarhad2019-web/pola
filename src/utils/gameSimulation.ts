@@ -24,7 +24,7 @@ export function createInitialGameState(): GameState {
       meat: 6,
     },
     dinars: 1200,
-    bannerColor: '#8b5cf6',
+    bannerColor: '#18181b',
   };
 
   // Initial AI Lord parties

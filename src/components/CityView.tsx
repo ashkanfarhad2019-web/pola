@@ -71,24 +71,32 @@ export const CityView: React.FC<CityViewProps> = ({
       <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-stone-800 bg-stone-900/90">
         <div className="flex items-center gap-3">
           <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg border border-white/20 shadow-md"
-            style={{ backgroundColor: faction?.color || '#475569' }}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg shadow-md border ${
+              isPlayerOwned ? 'bg-zinc-950 border-amber-500 text-amber-300 ring-2 ring-amber-500/30' : 'border-white/20'
+            }`}
+            style={{ backgroundColor: isPlayerOwned ? '#0c0c0e' : (faction?.color || '#475569') }}
           >
-            {settlement.type === 'town' ? '🏛️' : '🏰'}
+            {isPlayerOwned ? '👑' : (settlement.type === 'town' ? '🏛️' : '🏰')}
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg sm:text-xl font-bold tracking-wide text-amber-200">
                 {lang === 'ku' ? settlement.nameKu : settlement.name}
               </h1>
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-stone-800 text-stone-300 border border-stone-700">
-                {settlement.type === 'town' ? 'شار' : 'قەڵا'}
+              <span className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                isPlayerOwned 
+                  ? 'bg-zinc-950 text-amber-400 border-amber-500/60 font-bold' 
+                  : 'bg-stone-800 text-stone-300 border-stone-700'
+              }`}>
+                {isPlayerOwned 
+                  ? (settlement.type === 'town' ? 'شاری تۆ (ڕەش)' : 'قەڵای تۆ (ڕەش)')
+                  : (settlement.type === 'town' ? 'شار' : 'قەڵا')}
               </span>
             </div>
             <p className="text-xs text-stone-400">
-              {lang === 'ku' ? faction?.nameKu : faction?.name} • فەرمانڕەوا:{' '}
+              {lang === 'ku' ? (isPlayerOwned ? 'شانشینی شاهانەیی تۆ (ڕەش)' : faction?.nameKu) : (isPlayerOwned ? 'Your Sovereign Realm (Black)' : faction?.name)} • فەرمانڕەوا:{' '}
               <span className="text-stone-300 font-semibold">
-                {lordOwner ? (lang === 'ku' ? lordOwner.nameKu : lordOwner.name) : 'تۆ (پاشا)'}
+                {isPlayerOwned ? 'تۆ (پاشای فەرمانڕەوا)' : (lordOwner ? (lang === 'ku' ? lordOwner.nameKu : lordOwner.name) : 'تۆ (پاشا)')}
               </span>
             </p>
           </div>

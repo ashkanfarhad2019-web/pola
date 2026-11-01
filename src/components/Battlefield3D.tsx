@@ -87,11 +87,11 @@ export const Battlefield3D: React.FC<Battlefield3DProps> = ({
     dirLight.castShadow = !isSoftwareGl;
     scene.add(dirLight);
 
-    // Battlefield Ground
+    // Battlefield Ground (Natural, eye-comfort grass green)
     const groundGeo = new THREE.PlaneGeometry(120, 120);
     groundGeo.rotateX(-Math.PI / 2);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: battle.isSiege ? 0x4a473b : 0x2b3824,
+      color: battle.isSiege ? 0x2e3b2b : 0x243821,
       roughness: 0.9,
     });
     const ground = new THREE.Mesh(groundGeo, groundMat);
@@ -100,7 +100,7 @@ export const Battlefield3D: React.FC<Battlefield3DProps> = ({
 
     // If Siege: Construct Fortress Wall & Towers in background
     if (battle.isSiege) {
-      const stoneMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.9 });
+      const stoneMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 });
       const wallMesh = new THREE.Mesh(new THREE.BoxGeometry(60, 8, 4), stoneMat);
       wallMesh.position.set(0, 4, -25);
       scene.add(wallMesh);
@@ -118,12 +118,13 @@ export const Battlefield3D: React.FC<Battlefield3DProps> = ({
 
     function createSoldierMesh(u: CombatUnit): THREE.Group {
       const g = new THREE.Group();
-      const factionColor = u.isPlayerSide ? 0x8b5cf6 : 0xdc2626;
+      // Sovereign Obsidian Black for Player forces, Crimson for Enemies
+      const factionColor = u.isPlayerSide ? 0x111115 : 0xdc2626;
 
       const bodyMat = new THREE.MeshStandardMaterial({
-        color: u.type === 'cavalry' ? 0x334155 : factionColor,
+        color: u.type === 'cavalry' ? (u.isPlayerSide ? 0x18181b : 0x334155) : factionColor,
         roughness: 0.5,
-        metalness: 0.4,
+        metalness: u.isPlayerSide ? 0.6 : 0.3,
       });
 
       if (u.type === 'cavalry') {

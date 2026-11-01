@@ -457,7 +457,7 @@ export const INITIAL_FACTIONS: Record<FactionId, Faction> = {
     nameKu: 'شانشینی سەربەخۆی تۆ',
     ruler: 'You',
     rulerKu: 'تۆ (فەرمانڕەوا)',
-    color: '#8b5cf6', // Royal purple
+    color: '#18181b', // Sovereign Obsidian Black
     bannerIcon: 'Sword',
     description: 'A nascent realm forged by your own steel, diplomacy, and cunning commercial acumen.',
     descriptionKu: 'شانشینە تازەکەت کە بە حەقی شمشێر، بازرگانی دادپەروەرانە و سیاسەتی زیرەکانە بونیاتی دەنێیت.',
