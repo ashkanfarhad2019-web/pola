@@ -1,0 +1,6 @@
+{
+  "name": "Steel & Crown: Medieval Realm",
+  "description": "A hardcore medieval strategy and trade RPG inspired by Steel and Flesh. Features realistic market economies, smart AI kingdoms, deep politics, city sieges, and landscape mobile gameplay.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
