@@ -91,10 +91,10 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
       return /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(gpu);
     })();
 
-    // 1. Scene & Camera Setup
+    // 1. Scene & Camera Setup (Lush Green Medieval Overworld)
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0f1a15);
-    scene.fog = new THREE.FogExp2(0x12201a, 0.005);
+    scene.background = new THREE.Color(0x13301f); // Soothing, rich forest canopy atmospheric green
+    scene.fog = new THREE.FogExp2(0x163623, 0.0035);
 
     const camera = new THREE.PerspectiveCamera(
       45,
@@ -114,7 +114,7 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
     renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
+    renderer.toneMappingExposure = 1.18;
     renderer.shadowMap.enabled = !isSoftwareGl;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -125,12 +125,12 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
     scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
     pmremGenerator.dispose();
 
-    // 2. Lighting Rig
-    const hemiLight = new THREE.HemisphereLight(0xdff4e6, 0x1f2e23, 1.25);
+    // 2. Natural Sunbeam & Medieval Ambient Lighting
+    const hemiLight = new THREE.HemisphereLight(0xecfdf5, 0x1b3824, 1.4);
     scene.add(hemiLight);
 
-    const dirLight = new THREE.DirectionalLight(0xfff7e8, 2.1);
-    dirLight.position.set(70, 120, 50);
+    const dirLight = new THREE.DirectionalLight(0xfff7e2, 2.2);
+    dirLight.position.set(70, 130, 50);
     dirLight.castShadow = !isSoftwareGl;
     dirLight.shadow.mapSize.width = 2048;
     dirLight.shadow.mapSize.height = 2048;
@@ -144,8 +144,7 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
     dirLight.shadow.bias = -0.0004;
     scene.add(dirLight);
 
-    // 3. Terrain Generation (Procedural elevation & Eye-Comfort Natural Green Biome)
-    // Designed specifically to avoid eye fatigue: pure organic meadows, mossy highlands, and valley greens
+    // 3. 100% Lush Green Terrain Generation (Zero desert sand, zero snow, total eye comfort)
     const terrainSize = 380;
     const segments = 160;
     const terrainGeo = new THREE.PlaneGeometry(terrainSize, terrainSize, segments, segments);
@@ -161,40 +160,40 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
 
       let h = 0;
       if (x > 15 && z < -5) {
-        h = Math.sin(x * 0.08) * Math.cos(z * 0.08) * 9.0 + Math.sin(x * 0.15) * 3.5;
-        h = Math.max(0, h * 1.3);
+        h = Math.sin(x * 0.08) * Math.cos(z * 0.08) * 8.5 + Math.sin(x * 0.15) * 3.0;
+        h = Math.max(0, h * 1.25);
       } else if (z > 20) {
-        h = Math.sin(x * 0.05 + z * 0.08) * 2.8 + Math.sin(z * 0.12) * 1.3;
+        h = Math.sin(x * 0.05 + z * 0.08) * 2.6 + Math.sin(z * 0.12) * 1.2;
       } else {
-        h = Math.sin(x * 0.04) * Math.cos(z * 0.04) * 2.5;
+        h = Math.sin(x * 0.04) * Math.cos(z * 0.04) * 2.4;
       }
 
       posAttr.setY(i, h);
 
-      // Eye-comfort organic green palette:
-      const subtleNoise = (Math.sin(x * 0.2) + Math.cos(z * 0.2)) * 0.015;
+      // Organic natural green biome coloring (pure eye comfort):
+      const subtleNoise = (Math.sin(x * 0.22) + Math.cos(z * 0.22)) * 0.018;
 
       if (h > 6.0) {
-        // High ridges: soft mossy highland slate green
-        colorHelper.setRGB(0.24 + subtleNoise, 0.38 + subtleNoise, 0.24 + subtleNoise);
+        // High mountain crests: deep mossy evergreen slate green
+        colorHelper.setRGB(0.19 + subtleNoise, 0.44 + subtleNoise, 0.21 + subtleNoise);
       } else if (h > 2.8) {
-        // Rolling hill slopes: warm olive pasture green
-        colorHelper.setRGB(0.27 + subtleNoise, 0.45 + subtleNoise, 0.23 + subtleNoise);
+        // Rolling hill pastures: lush emerald highland green
+        colorHelper.setRGB(0.24 + subtleNoise, 0.52 + subtleNoise, 0.23 + subtleNoise);
       } else if (x < -20 && z > 0) {
-        // Western woodlands: rich calming forest emerald
-        colorHelper.setRGB(0.18 + subtleNoise, 0.37 + subtleNoise, 0.19 + subtleNoise);
+        // Western woodlands: deep calming spruce green
+        colorHelper.setRGB(0.18 + subtleNoise, 0.43 + subtleNoise, 0.20 + subtleNoise);
       } else if (x > -15 && x < 8 && z > -8 && z < 18) {
-        // Lowland rivers & central valley: lush spring meadow green
-        colorHelper.setRGB(0.23 + subtleNoise, 0.48 + subtleNoise, 0.24 + subtleNoise);
+        // Central river basin & valley: vibrant spring meadow green
+        colorHelper.setRGB(0.23 + subtleNoise, 0.57 + subtleNoise, 0.23 + subtleNoise);
       } else if (z > 25) {
-        // Southern meadows: warm savannah clover green (soothing, zero harsh sand glare)
-        colorHelper.setRGB(0.28 + subtleNoise, 0.46 + subtleNoise, 0.23 + subtleNoise);
+        // Southern river plains: rich warm clover green (100% green, zero sand glare)
+        colorHelper.setRGB(0.26 + subtleNoise, 0.51 + subtleNoise, 0.24 + subtleNoise);
       } else if (z < -45) {
-        // Northern realm: cool alpine pine green (soothing, zero blinding snow white)
-        colorHelper.setRGB(0.21 + subtleNoise, 0.41 + subtleNoise, 0.23 + subtleNoise);
+        // Northern mountains: deep pine forest green (100% green, zero blinding snow)
+        colorHelper.setRGB(0.18 + subtleNoise, 0.43 + subtleNoise, 0.20 + subtleNoise);
       } else {
-        // Heartlands: natural, restful grass green
-        colorHelper.setRGB(0.25 + subtleNoise, 0.47 + subtleNoise, 0.23 + subtleNoise);
+        // Continental heartlands: soothing natural pasture green
+        colorHelper.setRGB(0.24 + subtleNoise, 0.53 + subtleNoise, 0.23 + subtleNoise);
       }
       colors.push(colorHelper.r, colorHelper.g, colorHelper.b);
     }
@@ -204,8 +203,8 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
 
     const terrainMat = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.88,
-      metalness: 0.05,
+      roughness: 0.86,
+      metalness: 0.04,
       flatShading: true,
     });
     const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
@@ -214,13 +213,205 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
 
     function getGroundHeight(x: number, z: number): number {
       if (x > 15 && z < -5) {
-        const val = Math.sin(x * 0.08) * Math.cos(z * 0.08) * 9.0 + Math.sin(x * 0.15) * 3.5;
-        return Math.max(0, val * 1.3);
+        const val = Math.sin(x * 0.08) * Math.cos(z * 0.08) * 8.5 + Math.sin(x * 0.15) * 3.0;
+        return Math.max(0, val * 1.25);
       }
       if (z > 20) {
-        return Math.sin(x * 0.05 + z * 0.08) * 2.8 + Math.sin(z * 0.12) * 1.3;
+        return Math.sin(x * 0.05 + z * 0.08) * 2.6 + Math.sin(z * 0.12) * 1.2;
       }
-      return Math.sin(x * 0.04) * Math.cos(z * 0.04) * 2.5;
+      return Math.sin(x * 0.04) * Math.cos(z * 0.04) * 2.4;
+    }
+
+    // 3b. Winding Crystal Blue Medieval River Networks
+    const riverGroup = new THREE.Group();
+    scene.add(riverGroup);
+
+    const riverMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      roughness: 0.18,
+      metalness: 0.12,
+      transparent: true,
+      opacity: 0.88,
+    });
+
+    function createRiverRibbon(points: Array<[number, number]>, width: number = 2.4): THREE.Mesh {
+      const curve = new THREE.CatmullRomCurve3(
+        points.map(([px, pz]) => new THREE.Vector3(px, getGroundHeight(px, pz) + 0.12, pz))
+      );
+      const samplePoints = curve.getPoints(90);
+      const riverGeo = new THREE.BufferGeometry();
+      const vertices: number[] = [];
+      const indices: number[] = [];
+
+      for (let j = 0; j < samplePoints.length; j++) {
+        const p = samplePoints[j];
+        const nextP = samplePoints[Math.min(j + 1, samplePoints.length - 1)];
+        const prevP = samplePoints[Math.max(j - 1, 0)];
+        const dir = nextP.clone().sub(prevP).normalize();
+        const normal = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
+
+        const pLeft = p.clone().add(normal.clone().multiplyScalar(width / 2));
+        const pRight = p.clone().sub(normal.clone().multiplyScalar(width / 2));
+
+        vertices.push(pLeft.x, pLeft.y, pLeft.z);
+        vertices.push(pRight.x, pRight.y, pRight.z);
+
+        if (j < samplePoints.length - 1) {
+          const row1 = j * 2;
+          const row2 = (j + 1) * 2;
+          indices.push(row1, row1 + 1, row2);
+          indices.push(row1 + 1, row2 + 1, row2);
+        }
+      }
+
+      riverGeo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      riverGeo.setIndex(indices);
+      riverGeo.computeVertexNormals();
+
+      return new THREE.Mesh(riverGeo, riverMat);
+    }
+
+    // River 1: Great Tigris & Valley River
+    const river1 = createRiverRibbon([
+      [-80, -95],
+      [-55, -60],
+      [-25, -20],
+      [0, 10],
+      [35, 38],
+      [75, 55],
+      [110, 80],
+    ], 2.8);
+    riverGroup.add(river1);
+
+    // River 2: Euphrates & Levant Branch
+    const river2 = createRiverRibbon([
+      [-20, -100],
+      [-15, -45],
+      [-30, -10],
+      [-25, 20],
+      [-16, 45],
+      [10, 75],
+    ], 2.2);
+    riverGroup.add(river2);
+
+    // 3c. Medieval Trade Road Networks (Earthy tracks across the green landscape)
+    const roadGroup = new THREE.Group();
+    scene.add(roadGroup);
+    const roadMat = new THREE.MeshStandardMaterial({
+      color: 0x5a5538,
+      roughness: 0.95,
+      metalness: 0.05,
+      transparent: true,
+      opacity: 0.75,
+    });
+
+    function createRoadRibbon(points: Array<[number, number]>, width: number = 1.3): THREE.Mesh {
+      const curve = new THREE.CatmullRomCurve3(
+        points.map(([px, pz]) => new THREE.Vector3(px, getGroundHeight(px, pz) + 0.06, pz))
+      );
+      const samplePoints = curve.getPoints(50);
+      const roadGeo = new THREE.BufferGeometry();
+      const vertices: number[] = [];
+      const indices: number[] = [];
+
+      for (let j = 0; j < samplePoints.length; j++) {
+        const p = samplePoints[j];
+        const nextP = samplePoints[Math.min(j + 1, samplePoints.length - 1)];
+        const prevP = samplePoints[Math.max(j - 1, 0)];
+        const dir = nextP.clone().sub(prevP).normalize();
+        const normal = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
+
+        const pLeft = p.clone().add(normal.clone().multiplyScalar(width / 2));
+        const pRight = p.clone().sub(normal.clone().multiplyScalar(width / 2));
+
+        vertices.push(pLeft.x, pLeft.y, pLeft.z);
+        vertices.push(pRight.x, pRight.y, pRight.z);
+
+        if (j < samplePoints.length - 1) {
+          const row1 = j * 2;
+          const row2 = (j + 1) * 2;
+          indices.push(row1, row1 + 1, row2);
+          indices.push(row1 + 1, row2 + 1, row2);
+        }
+      }
+
+      roadGeo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      roadGeo.setIndex(indices);
+      roadGeo.computeVertexNormals();
+
+      return new THREE.Mesh(roadGeo, roadMat);
+    }
+
+    // Roads connecting key realm capitals
+    roadGroup.add(createRoadRibbon([[-48, -30], [-24, -58], [8, -100]])); // Baban to Caucasus
+    roadGroup.add(createRoadRibbon([[-48, -30], [20, -40], [65, -55]])); // Baban to Rawanduz
+    roadGroup.add(createRoadRibbon([[-48, -30], [-16, 8], [-32, 28]])); // Baban to Levant
+    roadGroup.add(createRoadRibbon([[-16, 8], [30, 72], [88, 40]])); // Levant to Diyarbakir to Baghdad
+    roadGroup.add(createRoadRibbon([[-80, 24], [-64, 55], [-10, 80]])); // Badinan to Mardin
+
+    // 3d. 3D Procedural Tree Groves (Lush Pine & Oak Woodlands)
+    const treeGroup = new THREE.Group();
+    scene.add(treeGroup);
+
+    const trunkGeo = new THREE.CylinderGeometry(0.12, 0.2, 1.4, 5);
+    const pineLeafGeo1 = new THREE.ConeGeometry(1.1, 1.8, 5);
+    const pineLeafGeo2 = new THREE.ConeGeometry(0.8, 1.5, 5);
+    const oakLeafGeo = new THREE.DodecahedronGeometry(1.2, 1);
+
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x3d2716, roughness: 0.9 });
+    const pineGreenMat1 = new THREE.MeshStandardMaterial({ color: 0x194520, roughness: 0.75, flatShading: true });
+    const pineGreenMat2 = new THREE.MeshStandardMaterial({ color: 0x22582b, roughness: 0.75, flatShading: true });
+    const oakGreenMat = new THREE.MeshStandardMaterial({ color: 0x296e2e, roughness: 0.8, flatShading: true });
+
+    // Seeded random pseudo-random generator for fixed natural tree placement
+    let seed = 1234567;
+    function pseudoRandom(): number {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    }
+
+    // Place 240+ trees in organic clusters away from city centers
+    const settlementPositions = Object.values(stateRef.current.settlements).map(s => ({ x: s.x, z: s.z }));
+
+    for (let t = 0; t < 260; t++) {
+      const rx = (pseudoRandom() - 0.5) * 320;
+      const rz = (pseudoRandom() - 0.5) * 320;
+
+      // Skip if too close to settlements
+      const nearSettlement = settlementPositions.some(s => {
+        const dx = s.x - rx;
+        const dz = s.z - rz;
+        return dx * dx + dz * dz < 120;
+      });
+      if (nearSettlement) continue;
+
+      const gy = getGroundHeight(rx, rz);
+      const isPine = pseudoRandom() > 0.45 || rz < -20;
+      const scale = 0.85 + pseudoRandom() * 0.5;
+
+      const singleTree = new THREE.Group();
+      singleTree.position.set(rx, gy, rz);
+      singleTree.scale.set(scale, scale, scale);
+
+      const trunk = new THREE.Mesh(trunkGeo, woodMat);
+      trunk.position.y = 0.7;
+      singleTree.add(trunk);
+
+      if (isPine) {
+        const pine1 = new THREE.Mesh(pineLeafGeo1, pineGreenMat1);
+        pine1.position.y = 1.8;
+        singleTree.add(pine1);
+
+        const pine2 = new THREE.Mesh(pineLeafGeo2, pineGreenMat2);
+        pine2.position.y = 2.6;
+        singleTree.add(pine2);
+      } else {
+        const oak = new THREE.Mesh(oakLeafGeo, oakGreenMat);
+        oak.position.y = 2.1;
+        singleTree.add(oak);
+      }
+
+      treeGroup.add(singleTree);
     }
 
     // 3D floating canvas text badge for cities/castles
