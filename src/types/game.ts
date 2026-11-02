@@ -179,6 +179,7 @@ export interface RealmPolicy {
 export interface PlayerCharacter {
   name: string;
   title: string;
+  titleKu?: string;
   dinars: number;
   renown: number;
   honor: number;

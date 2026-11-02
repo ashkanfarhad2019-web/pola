@@ -17,7 +17,7 @@ import { Battlefield3D } from './components/Battlefield3D';
 import { SaveLoadModal } from './components/SaveLoadModal';
 import { TitleScreen } from './components/TitleScreen';
 import { LogView } from './components/LogView';
-import { TROOP_CATALOG } from './data/worldData';
+import { TRADE_GOODS, TROOP_CATALOG } from './data/worldData';
 
 export default function App() {
   const [screen, setScreen] = useState<'title' | 'playing'>('title');
@@ -150,8 +150,23 @@ export default function App() {
   const initiateBattle = (enemyParty: Party) => {
     sfx.playWarHorn();
 
-    // Spawn tactical combat units
-    const playerUnits: CombatUnit[] = [];
+    // Spawn tactical combat units (Always includes the Commander Hero in person!)
+    const playerUnits: CombatUnit[] = [
+      {
+        id: 'p_hero',
+        troopId: 'player_hero',
+        isPlayerSide: true,
+        hp: 280,
+        maxHp: 280,
+        x: 0,
+        z: 16,
+        type: 'cavalry',
+        order: 'charge',
+        cooldown: 0,
+        kills: 0,
+        isDead: false,
+      },
+    ];
     let pIdx = 0;
     gameState.player.troops.forEach((stack) => {
       const tDef = TROOP_CATALOG[stack.troopId];
@@ -163,7 +178,7 @@ export default function App() {
           hp: tDef ? tDef.maxHp : 80,
           maxHp: tDef ? tDef.maxHp : 80,
           x: (i % 8) * 3 - 12,
-          z: 15 + Math.floor(i / 8) * 3,
+          z: 20 + Math.floor(i / 8) * 3,
           type: tDef ? tDef.type : 'infantry',
           order: 'charge',
           cooldown: Math.random() * 0.5,
@@ -221,8 +236,23 @@ export default function App() {
 
     sfx.playWarHorn();
 
-    // Spawn player army
-    const playerUnits: CombatUnit[] = [];
+    // Spawn player army (Led by the Commander Hero!)
+    const playerUnits: CombatUnit[] = [
+      {
+        id: 'p_hero',
+        troopId: 'player_hero',
+        isPlayerSide: true,
+        hp: 280,
+        maxHp: 280,
+        x: 0,
+        z: 22,
+        type: 'cavalry',
+        order: 'charge',
+        cooldown: 0,
+        kills: 0,
+        isDead: false,
+      },
+    ];
     let pIdx = 0;
     gameState.player.troops.forEach((stack) => {
       const tDef = TROOP_CATALOG[stack.troopId];
@@ -234,7 +264,7 @@ export default function App() {
           hp: tDef ? tDef.maxHp : 80,
           maxHp: tDef ? tDef.maxHp : 80,
           x: (i % 8) * 3.5 - 14,
-          z: 22 + Math.floor(i / 8) * 3,
+          z: 26 + Math.floor(i / 8) * 3,
           type: tDef ? tDef.type : 'infantry',
           order: 'charge',
           cooldown: Math.random() * 0.5,
@@ -332,9 +362,9 @@ export default function App() {
           delete next.parties[b.enemyPartyId];
         }
       } else if (result === 'defeat') {
-        // Player defeated: loses 30% dinars and recruits
-        next.player.dinars = Math.floor(next.player.dinars * 0.7);
-        next.player.troops = [{ troopId: 'recruit', count: 5, wounded: 0 }];
+        // Player defeated: loses 30% dinars and surviving mercenaries scatter
+        next.player.dinars = Math.max(20, Math.floor(next.player.dinars * 0.7));
+        next.player.troops = [];
       }
 
       next.battle = undefined;
@@ -342,7 +372,7 @@ export default function App() {
     });
   };
 
-  // Trade: Buy Good
+  // Trade: Buy Good (Strict Dynamic Supply & Demand)
   const handleBuyGood = (settlementId: string, goodId: GoodId, quantity: number) => {
     setGameState((prev) => {
       const next = { ...prev };
@@ -358,9 +388,12 @@ export default function App() {
       next.player.dinars -= totalCost;
       mItem.stock -= quantity;
 
-      // Realistic price slippage: buying raises price!
-      mItem.buyPrice = Math.round(mItem.buyPrice * 1.04);
-      mItem.sellPrice = Math.max(1, Math.round(mItem.buyPrice * 0.78));
+      // Dynamic supply & demand law: Purchasing stock causes local market prices to surge
+      const goodDef = TRADE_GOODS[goodId];
+      const targetStock = 35;
+      const scarcity = Math.pow(targetStock / Math.max(mItem.stock, 2), 0.72);
+      mItem.buyPrice = Math.max(2, Math.round(goodDef.basePrice * Math.min(3.5, Math.max(0.35, scarcity))));
+      mItem.sellPrice = Math.max(1, Math.round(mItem.buyPrice * 0.76));
 
       // Add to inventory
       next.player.inventory[goodId] = (next.player.inventory[goodId] || 0) + quantity;
@@ -369,7 +402,7 @@ export default function App() {
     });
   };
 
-  // Trade: Sell Good
+  // Trade: Sell Good (Strict Dynamic Supply & Demand)
   const handleSellGood = (settlementId: string, goodId: GoodId, quantity: number) => {
     setGameState((prev) => {
       const next = { ...prev };
@@ -386,9 +419,12 @@ export default function App() {
       next.player.inventory[goodId] = playerHas - quantity;
       mItem.stock += quantity;
 
-      // Realistic price slippage: dumping inventory drops price!
-      mItem.buyPrice = Math.max(2, Math.round(mItem.buyPrice * 0.96));
-      mItem.sellPrice = Math.max(1, Math.round(mItem.buyPrice * 0.78));
+      // Dynamic supply & demand law: Flooding the market lowers prices
+      const goodDef = TRADE_GOODS[goodId];
+      const targetStock = 35;
+      const scarcity = Math.pow(targetStock / Math.max(mItem.stock, 2), 0.72);
+      mItem.buyPrice = Math.max(2, Math.round(goodDef.basePrice * Math.min(3.5, Math.max(0.35, scarcity))));
+      mItem.sellPrice = Math.max(1, Math.round(mItem.buyPrice * 0.76));
 
       return next;
     });

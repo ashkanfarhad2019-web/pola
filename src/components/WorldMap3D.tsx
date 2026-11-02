@@ -146,8 +146,8 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
 
     // 3. Terrain Generation (Procedural elevation & Eye-Comfort Natural Green Biome)
     // Designed specifically to avoid eye fatigue: pure organic meadows, mossy highlands, and valley greens
-    const terrainSize = 260;
-    const segments = 128;
+    const terrainSize = 380;
+    const segments = 160;
     const terrainGeo = new THREE.PlaneGeometry(terrainSize, terrainSize, segments, segments);
     terrainGeo.rotateX(-Math.PI / 2);
 
@@ -575,8 +575,8 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
 
         // Continuous smooth pan without ANY jumping
         const panSpeed = 0.082 * zoomLevelRef.current;
-        cameraTargetRef.current.x = Math.max(-75, Math.min(75, cameraTargetRef.current.x - dx * panSpeed));
-        cameraTargetRef.current.z = Math.max(-75, Math.min(75, cameraTargetRef.current.z - dy * panSpeed));
+        cameraTargetRef.current.x = Math.max(-125, Math.min(125, cameraTargetRef.current.x - dx * panSpeed));
+        cameraTargetRef.current.z = Math.max(-135, Math.min(135, cameraTargetRef.current.z - dy * panSpeed));
         pointerDownPos = { x: clientX, y: clientY };
       }
     };

@@ -27,6 +27,8 @@ export const Battlefield3D: React.FC<Battlefield3DProps> = ({
   const t = TRANSLATIONS[lang];
 
   const [currentOrder, setCurrentOrder] = useState<'charge' | 'hold' | 'advance' | 'retreat'>('charge');
+  const [heroCooldown, setHeroCooldown] = useState<number>(0);
+  const heroCooldownRef = useRef<number>(0);
   const [battleResolved, setBattleResolved] = useState<'victory' | 'defeat' | 'retreat' | null>(null);
   const [playerAlive, setPlayerAlive] = useState(battle.playerUnits.filter((u) => !u.isDead).length);
   const [enemyAlive, setEnemyAlive] = useState(battle.enemyUnits.filter((u) => !u.isDead).length);
@@ -37,6 +39,36 @@ export const Battlefield3D: React.FC<Battlefield3DProps> = ({
   });
   const orderRef = useRef(currentOrder);
   orderRef.current = currentOrder;
+
+  const handleHeroSlash = () => {
+    if (heroCooldownRef.current > 0) return;
+    sfx.playSwordClash();
+    heroCooldownRef.current = 1.6;
+    setHeroCooldown(1.6);
+
+    const hero = unitsRef.current.player.find((u) => (u.id === 'p_hero' || u.troopId === 'player_hero') && !u.isDead);
+    if (!hero) return;
+
+    let closestE: CombatUnit | null = null;
+    let minDist = 8.5;
+    unitsRef.current.enemy.forEach((e) => {
+      if (e.isDead) return;
+      const d = Math.hypot(e.x - hero.x, e.z - hero.z);
+      if (d < minDist) {
+        minDist = d;
+        closestE = e;
+      }
+    });
+
+    if (closestE) {
+      const target = closestE as CombatUnit;
+      target.hp -= 75;
+      if (target.hp <= 0) {
+        target.isDead = true;
+        hero.kills++;
+      }
+    }
+  };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -150,6 +182,36 @@ export const Battlefield3D: React.FC<Battlefield3DProps> = ({
       helmet.position.y = u.type === 'cavalry' ? 2.4 : 1.5;
       g.add(helmet);
 
+      // Hero Commander Special Adornments (Crown, Obsidian Cape & Sword)
+      const isHero = u.id === 'p_hero' || u.troopId === 'player_hero';
+      if (isHero) {
+        // Golden Crown over Helmet!
+        const crown = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.28, 0.22, 0.16, 6),
+          new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.9, roughness: 0.2 })
+        );
+        crown.position.y = u.type === 'cavalry' ? 2.65 : 1.75;
+        g.add(crown);
+
+        // Regal obsidian & gold cape
+        const cape = new THREE.Mesh(
+          new THREE.BoxGeometry(0.5, 1.1, 0.05),
+          new THREE.MeshStandardMaterial({ color: 0x0c0c0e, roughness: 0.4 })
+        );
+        cape.position.set(0, u.type === 'cavalry' ? 1.6 : 0.7, -0.35);
+        cape.rotation.x = -0.2;
+        g.add(cape);
+
+        // Longsword
+        const sword = new THREE.Mesh(
+          new THREE.BoxGeometry(0.06, 1.1, 0.06),
+          new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.9, roughness: 0.15 })
+        );
+        sword.position.set(0.45, u.type === 'cavalry' ? 1.8 : 0.9, 0.2);
+        sword.rotation.x = 0.4;
+        g.add(sword);
+      }
+
       // Shield or Bow
       if (u.type === 'archer') {
         const bow = new THREE.Mesh(
@@ -206,6 +268,11 @@ export const Battlefield3D: React.FC<Battlefield3DProps> = ({
       const now = performance.now();
       const dt = Math.min((now - lastTime) / 1000, 0.05);
       lastTime = now;
+
+      if (heroCooldownRef.current > 0) {
+        heroCooldownRef.current = Math.max(0, heroCooldownRef.current - dt);
+        setHeroCooldown(Number(heroCooldownRef.current.toFixed(1)));
+      }
 
       const pUnits = unitsRef.current.player;
       const eUnits = unitsRef.current.enemy;
@@ -426,12 +493,23 @@ export const Battlefield3D: React.FC<Battlefield3DProps> = ({
         </div>
       </div>
 
-      {/* Bottom Tactical Order Bar */}
+      {/* Bottom Tactical Order Bar & Hero Action */}
       {!battleResolved && (
-        <div className="mt-auto relative z-10 p-4 flex justify-center items-center gap-3 bg-gradient-to-t from-stone-950/95 via-stone-950/60 to-transparent">
+        <div className="mt-auto relative z-10 p-3 sm:p-4 flex flex-wrap justify-center items-center gap-2 sm:gap-3 bg-gradient-to-t from-stone-950/95 via-stone-950/60 to-transparent">
+          {/* Active Hero Strike (Direct Player Attack in 3D combat) */}
+          <button
+            onClick={handleHeroSlash}
+            disabled={heroCooldown > 0}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-stone-950 border border-amber-300 shadow-xl shadow-amber-900/50 disabled:opacity-40 transition scale-105 active:scale-95"
+          >
+            <Swords className="w-4 h-4 text-stone-950" />
+            <span>⚔️ لێدانی فەرماندە (Slash)</span>
+            {heroCooldown > 0 && <span className="text-[11px] opacity-80">({heroCooldown}s)</span>}
+          </button>
+
           <button
             onClick={() => handleOrder('charge')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all border ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all border ${
               currentOrder === 'charge'
                 ? 'bg-amber-600 border-amber-400 text-white shadow-lg shadow-amber-900/50 scale-105'
                 : 'bg-stone-900/80 border-stone-700 text-stone-300 hover:bg-stone-800'
@@ -443,7 +521,7 @@ export const Battlefield3D: React.FC<Battlefield3DProps> = ({
 
           <button
             onClick={() => handleOrder('hold')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all border ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all border ${
               currentOrder === 'hold'
                 ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-900/50 scale-105'
                 : 'bg-stone-900/80 border-stone-700 text-stone-300 hover:bg-stone-800'

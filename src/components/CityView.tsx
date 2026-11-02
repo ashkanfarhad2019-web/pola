@@ -451,21 +451,35 @@ export const CityView: React.FC<CityViewProps> = ({
                       <div className="flex gap-4 text-xs text-stone-400 mt-1">
                         <span>هێزی لێدان: <b className="text-red-400">{tDef.meleeAttack || tDef.rangedAttack}</b></span>
                         <span>زرێ: <b className="text-blue-400">{tDef.armor}</b></span>
-                        <span>تەندروستی: <b className="text-emerald-400">{tDef.maxHp} HP</b></span>
+                        <span>مەعاش: <b className="text-amber-400">{tDef.dailyWage} دینار/ڕۆژ</b></span>
                       </div>
                     </div>
 
-                    <button
-                      disabled={!canAfford}
-                      onClick={() => {
-                        sfx.playWarHorn();
-                        onRecruitTroop(troopKey, 5);
-                      }}
-                      className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-30 text-white font-bold text-xs transition shadow-lg flex items-center justify-center gap-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>وەرگرتنی ٥ سەرباز ({costFor5} دینار)</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        disabled={gameState.player.dinars < tDef.recruitCost}
+                        onClick={() => {
+                          sfx.playWarHorn();
+                          onRecruitTroop(troopKey, 1);
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 disabled:opacity-30 text-white font-bold text-xs transition shadow-md flex items-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>١ سەرباز ({tDef.recruitCost} دینار)</span>
+                      </button>
+
+                      <button
+                        disabled={!canAfford}
+                        onClick={() => {
+                          sfx.playWarHorn();
+                          onRecruitTroop(troopKey, 5);
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-30 text-white font-bold text-xs transition shadow-md flex items-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>٥ سەرباز ({costFor5} دینار)</span>
+                      </button>
+                    </div>
                   </div>
                 );
               })}
