@@ -3,7 +3,7 @@
  * Steel & Crown: Medieval Realm (Steel and Flesh inspired RPG)
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { CombatUnit, FactionId, GameState, GoodId, Party, Settlement, TroopStack, Workshop } from './types/game';
+import { CombatUnit, FactionId, GameState, GoodId, Party, Settlement, SpyAgent, TroopStack, Workshop } from './types/game';
 import { createInitialGameState, simulateTick } from './utils/gameSimulation';
 import { loadGameFromStorage, saveGameToStorage } from './utils/saveManager';
 import { Language, TRANSLATIONS } from './localization/translations';
@@ -17,6 +17,7 @@ import { Battlefield3D } from './components/Battlefield3D';
 import { SaveLoadModal } from './components/SaveLoadModal';
 import { TitleScreen } from './components/TitleScreen';
 import { LogView } from './components/LogView';
+import { NewsIntelligenceView } from './components/NewsIntelligenceView';
 import { TRADE_GOODS, TROOP_CATALOG } from './data/worldData';
 
 export default function App() {
@@ -26,7 +27,7 @@ export default function App() {
   const [saveModalOpen, setSaveModalOpen] = useState<boolean>(false);
 
   // Active overlay view on top of 3D map
-  const [activeView, setActiveView] = useState<'map' | 'city' | 'party' | 'diplomacy' | 'log'>('map');
+  const [activeView, setActiveView] = useState<'map' | 'city' | 'party' | 'diplomacy' | 'news' | 'log'>('map');
   const [currentSettlementId, setCurrentSettlementId] = useState<string | null>(null);
 
   // Check if save file exists in storage
@@ -683,6 +684,164 @@ export default function App() {
     });
   };
 
+  // Secret Treaty Sealed with King
+  const handleSealSecretPact = (factionId: FactionId, titleKu: string, termsKu: string) => {
+    setGameState((prev) => {
+      const next = { ...prev };
+      const pactId = `pact_${Date.now()}`;
+      next.player.secretPacts = [
+        ...(next.player.secretPacts || []),
+        { id: pactId, factionId, titleKu, termsKu, active: true },
+      ];
+      const fac = next.factions[factionId];
+      if (fac) {
+        fac.relations['player_kingdom'] = (fac.relations['player_kingdom'] || 0) + 20;
+      }
+      next.logs.unshift({
+        id: `pact_log_${Date.now()}`,
+        day: next.day,
+        hour: next.hour,
+        textKu: `پەیمانی نهێنی بە سەرکەوتوویی لەگەڵ ${fac?.nameKu || factionId} واژۆ کرا! هاوپەیمانی لە سێبەردا بەردەوامە.`,
+        textEn: `Secret treaty sealed with ${fac?.name || factionId}!`,
+        type: 'politics',
+      });
+      next.news.unshift({
+        id: `news_pact_${Date.now()}`,
+        day: next.day,
+        titleKu: `پەیماننامەیەکی نهێنی لە سێبەردا واژۆ کرا`,
+        contentKu: `دەنگۆی گرێبەستی نهێنی نێوان فەرماندە و دەسەڵاتدارانی ${fac?.nameKu} لە نێو کۆشکەکاندا بڵاوبووەتەوە.`,
+        type: 'scandal',
+        importance: 'high',
+        factionId,
+      });
+      return next;
+    });
+  };
+
+  // Grant Official Court Office
+  const handleGrantOffice = (officeId: string, titleKu: string, dailySalary: number, perkKu: string) => {
+    setGameState((prev) => {
+      const next = { ...prev };
+      const dig = next.dignitaries[officeId];
+      next.player.appointedOffices = [
+        ...(next.player.appointedOffices || []),
+        {
+          id: officeId,
+          office: dig?.office || 'chancellor',
+          settlementId: dig?.settlementId || 'val_capital',
+          titleKu,
+          dailySalary,
+          perkKu,
+        },
+      ];
+      next.player.honor += 5;
+      next.player.renown += 10;
+      next.logs.unshift({
+        id: `office_log_${Date.now()}`,
+        day: next.day,
+        hour: next.hour,
+        textKu: `پیرۆزە! پلەی فەرمی (${titleKu}) بە مووچەی ڕۆژانەی ${dailySalary} دینار پێت بەخشرا!`,
+        textEn: `Appointed to official post: ${titleKu} with ${dailySalary} daily salary!`,
+        type: 'fief',
+      });
+      return next;
+    });
+  };
+
+  // Bribe Chamberlain for Royal Audience
+  const handleBribeChamberlain = (factionId: FactionId, cost: number) => {
+    setGameState((prev) => {
+      if (prev.player.dinars < cost) return prev;
+      const next = { ...prev };
+      next.player.dinars -= cost;
+      next.player.chamberlainBribes = {
+        ...(next.player.chamberlainBribes || {}),
+        [factionId]: true,
+      };
+      next.logs.unshift({
+        id: `bribe_cham_${Date.now()}`,
+        day: next.day,
+        hour: next.hour,
+        textKu: `بڕی ${cost} دینار بەرتیل درایە کارگێڕی کۆشک بۆ کردنەوەی دەرگای دیداری تایبەتی پاشا.`,
+        textEn: `Paid ${cost} dinars bribe to chamberlain for royal audience access.`,
+        type: 'politics',
+      });
+      return next;
+    });
+  };
+
+  // Recruit Spy
+  const handleRecruitSpy = (settlementId: string) => {
+    setGameState((prev) => {
+      if (prev.player.dinars < 350) return prev;
+      const next = { ...prev };
+      next.player.dinars -= 350;
+      const settlement = next.settlements[settlementId];
+      let garrisonCount = 0;
+      settlement?.garrison.forEach((g) => { garrisonCount += g.count; });
+
+      const newSpy: SpyAgent = {
+        id: `spy_${Date.now()}`,
+        nameKu: `سیخوڕی شاراوە ${ (next.player.spies?.length || 0) + 1}`,
+        targetSettlementId: settlementId,
+        infiltratedDays: 1,
+        coverIntegrity: 92,
+        dailyUpkeep: 25,
+        lastIntel: {
+          garrisonCount,
+          foodDays: settlement?.foodReservesDays || 50,
+          defenseLevel: settlement?.defenseLevel || 3,
+          prosperity: settlement?.prosperity || 70,
+          secretRumorKu: 'پاسەوانانی قەڵا لە دۆخی ئاساییدان و چاودێری دەروازەکان دەکەن.',
+          vulnerabilitiesKu: ['بیری ئاوی دەرەوە لە مەترسی ژەهراویکردندایە'],
+        },
+      };
+
+      next.player.spies = [...(next.player.spies || []), newSpy];
+      next.logs.unshift({
+        id: `spy_rec_${Date.now()}`,
+        day: next.day,
+        hour: next.hour,
+        textKu: `سیخوڕێک بە سەرکەوتوویی دزەی کردە ناو شاری ${settlement?.nameKu || settlementId}. ڕاپۆرتی زانیاری لە بەشی هەواڵەکان نوێ دەبێتەوە.`,
+        textEn: `Spy successfully infiltrated ${settlement?.name || settlementId}.`,
+        type: 'politics',
+      });
+      return next;
+    });
+  };
+
+  // Spy Sabotage Action
+  const handleSpySabotage = (spyId: string, actionType: 'poison_water' | 'burn_granary' | 'bribe_gate') => {
+    setGameState((prev) => {
+      const spy = prev.player.spies?.find((s) => s.id === spyId);
+      if (!spy) return prev;
+
+      let cost = 180;
+      if (actionType === 'burn_granary') cost = 220;
+      if (actionType === 'bribe_gate') cost = 350;
+      if (prev.player.dinars < cost) return prev;
+
+      const next = { ...prev };
+      next.player.dinars -= cost;
+      const s = next.settlements[spy.targetSettlementId];
+
+      if (s) {
+        if (actionType === 'poison_water') {
+          s.foodReservesDays = Math.max(5, s.foodReservesDays - 25);
+          s.publicOrder = Math.max(20, s.publicOrder - 15);
+        } else if (actionType === 'burn_granary') {
+          s.foodReservesDays = Math.max(5, s.foodReservesDays - 35);
+          s.prosperity = Math.max(20, s.prosperity - 15);
+        } else if (actionType === 'bribe_gate') {
+          s.defenseLevel = Math.max(1, s.defenseLevel - 2);
+        }
+      }
+
+      spy.coverIntegrity = Math.max(30, spy.coverIntegrity - 12);
+      return next;
+    });
+  };
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-stone-950 text-stone-100 select-none">
       {/* TITLE SCREEN */}
@@ -774,6 +933,20 @@ export default function App() {
               onBribeLord={handleBribeLord}
               onTogglePolicy={handleTogglePolicy}
               onFoundKingdom={handleFoundKingdom}
+              onSealSecretPact={handleSealSecretPact}
+              onGrantOffice={handleGrantOffice}
+              onBribeChamberlain={handleBribeChamberlain}
+            />
+          )}
+
+          {/* NEWS & INTELLIGENCE DISPATCH */}
+          {activeView === 'news' && (
+            <NewsIntelligenceView
+              gameState={gameState}
+              lang={lang}
+              onClose={() => setActiveView('map')}
+              onRecruitSpy={handleRecruitSpy}
+              onSpySabotage={handleSpySabotage}
             />
           )}
 

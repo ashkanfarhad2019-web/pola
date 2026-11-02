@@ -23,15 +23,16 @@ import {
   ChevronUp, 
   Maximize2,
   Compass,
-  RotateCw
+  RotateCw,
+  Eye
 } from 'lucide-react';
 
 interface TacticalHUDProps {
   gameState: GameState;
   lang: Language;
-  activeView: 'map' | 'city' | 'party' | 'diplomacy' | 'log';
+  activeView: 'map' | 'city' | 'party' | 'diplomacy' | 'news' | 'log';
   currentSettlementId: string | null;
-  onOpenView: (view: 'map' | 'city' | 'party' | 'diplomacy' | 'log') => void;
+  onOpenView: (view: 'map' | 'city' | 'party' | 'diplomacy' | 'news' | 'log') => void;
   onOpenSaveModal: () => void;
   onChangeSpeed: (speed: 0 | 1 | 2 | 5) => void;
 }
@@ -272,6 +273,22 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
             >
               <Scale className="w-4 h-4" />
               <span>{t.tabDiplomacy}</span>
+            </button>
+
+            {/* News & Spies */}
+            <button
+              onClick={() => {
+                sfx.playClick();
+                onOpenView('news');
+              }}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                activeView === 'news'
+                  ? 'bg-amber-500 text-stone-950 shadow-md'
+                  : 'text-stone-300 hover:bg-stone-800/70'
+              }`}
+            >
+              <Eye className="w-4 h-4 text-amber-400" />
+              <span>هەواڵ و سیخوڕی</span>
             </button>
 
             {/* Chronicles / Log */}

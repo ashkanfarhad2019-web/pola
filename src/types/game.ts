@@ -3,7 +3,7 @@
  * Steel and Flesh-inspired Grand Medieval Strategy RPG
  */
 
-export type FactionId = 'valoria' | 'eisenreich' | 'saruq' | 'verdant' | 'maritia' | 'frostgard' | 'player_kingdom';
+export type FactionId = 'valoria' | 'eisenreich' | 'saruq' | 'verdant' | 'maritia' | 'frostgard' | 'al_zahra' | 'strathcarron' | 'player_kingdom';
 
 export interface Faction {
   id: FactionId;
@@ -176,6 +176,53 @@ export interface RealmPolicy {
   isActive: boolean;
 }
 
+export type DignitaryOffice = 'chancellor' | 'marshal' | 'spymaster' | 'magistrate' | 'guildmaster';
+
+export interface Dignitary {
+  id: string;
+  name: string;
+  nameKu: string;
+  titleKu: string;
+  office: DignitaryOffice;
+  factionId: FactionId;
+  settlementId: string;
+  personalityKu: string;
+  influence: number; // 0 to 100
+  bribeCost: number;
+  relationWithPlayer: number; // -100 to 100
+  dialogueGreetingKu: string;
+  requirementsKu: string;
+  perkDescriptionKu: string;
+}
+
+export interface SpyAgent {
+  id: string;
+  nameKu: string;
+  targetSettlementId: string;
+  infiltratedDays: number;
+  coverIntegrity: number; // 0-100%
+  dailyUpkeep: number;
+  lastIntel?: {
+    garrisonCount: number;
+    foodDays: number;
+    defenseLevel: number;
+    prosperity: number;
+    secretRumorKu: string;
+    vulnerabilitiesKu: string[];
+  };
+}
+
+export interface NewsDispatch {
+  id: string;
+  day: number;
+  titleKu: string;
+  contentKu: string;
+  type: 'war' | 'peace' | 'siege' | 'assassination' | 'scandal' | 'market' | 'spy_report';
+  importance: 'high' | 'critical';
+  factionId?: FactionId;
+  settlementId?: string;
+}
+
 export interface PlayerCharacter {
   name: string;
   title: string;
@@ -190,6 +237,23 @@ export interface PlayerCharacter {
   fiefIds: string[];
   workshops: Workshop[];
   activePolicies: string[];
+  spies: SpyAgent[];
+  appointedOffices: Array<{
+    id: string;
+    office: DignitaryOffice;
+    settlementId: string;
+    titleKu: string;
+    dailySalary: number;
+    perkKu: string;
+  }>;
+  chamberlainBribes: Record<string, boolean>;
+  secretPacts: Array<{
+    id: string;
+    factionId: FactionId;
+    titleKu: string;
+    termsKu: string;
+    active: boolean;
+  }>;
 }
 
 export interface CombatUnit {
@@ -246,6 +310,8 @@ export interface GameState {
   player: PlayerCharacter;
   policies: RealmPolicy[];
   logs: GameLogMessage[];
+  dignitaries: Record<string, Dignitary>;
+  news: NewsDispatch[];
   battle?: BattleState;
   arrivedAtSettlementId?: string;
   targetDestinationName?: string;

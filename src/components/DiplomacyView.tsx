@@ -1,10 +1,11 @@
 /**
- * Deep Realm Politics, Treaties, Fealty & Faction Diplomacy Panel
+ * Deep Realm Politics, Treaties, Fealty, Kings Chat & Dignitaries Panel
  */
 import React, { useState } from 'react';
-import { Faction, FactionId, GameState, Lord, RealmPolicy } from '../types/game';
+import { Dignitary, Faction, FactionId, GameState, Lord, RealmPolicy } from '../types/game';
 import { TRANSLATIONS, Language } from '../localization/translations';
 import { sfx } from '../audio/soundFx';
+import { AudienceModal } from './AudienceModal';
 import { 
   Crown, 
   Swords, 
@@ -15,7 +16,13 @@ import {
   Users, 
   AlertTriangle,
   X,
-  Scale
+  Scale,
+  Award,
+  MessageSquareQuote,
+  CheckCircle2,
+  Lock,
+  Building,
+  KeyRound
 } from 'lucide-react';
 
 interface DiplomacyViewProps {
@@ -29,6 +36,9 @@ interface DiplomacyViewProps {
   onBribeLord: (lordId: string) => void;
   onTogglePolicy: (policyId: string) => void;
   onFoundKingdom: () => void;
+  onSealSecretPact: (factionId: FactionId, titleKu: string, termsKu: string) => void;
+  onGrantOffice: (officeId: string, titleKu: string, dailySalary: number, perkKu: string) => void;
+  onBribeChamberlain: (factionId: FactionId, cost: number) => void;
 }
 
 export const DiplomacyView: React.FC<DiplomacyViewProps> = ({
@@ -42,14 +52,25 @@ export const DiplomacyView: React.FC<DiplomacyViewProps> = ({
   onBribeLord,
   onTogglePolicy,
   onFoundKingdom,
+  onSealSecretPact,
+  onGrantOffice,
+  onBribeChamberlain,
 }) => {
   const t = TRANSLATIONS[lang];
   const [selectedFactionId, setSelectedFactionId] = useState<FactionId>('valoria');
-  const [tab, setTab] = useState<'realms' | 'policies' | 'lords'>('realms');
+  const [tab, setTab] = useState<'realms' | 'dignitaries' | 'policies' | 'lords'>('realms');
+
+  // Audience Modal State
+  const [activeAudience, setActiveAudience] = useState<{
+    targetType: 'king' | 'dignitary';
+    faction: Faction;
+    dignitary?: Dignitary;
+  } | null>(null);
 
   const selectedFaction = gameState.factions[selectedFactionId];
   const isPlayerKingdom = gameState.player.factionId === 'player_kingdom';
   const playerHasFief = gameState.player.fiefIds.length > 0;
+  const player = gameState.player;
 
   // Active treaties for selected faction
   const activeWars = selectedFaction?.treaties.filter((t) => t.type === 'war') || [];
@@ -65,7 +86,9 @@ export const DiplomacyView: React.FC<DiplomacyViewProps> = ({
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-wide text-amber-200">{t.diplomacyTitle}</h1>
-            <p className="text-xs text-stone-400">هاوسەنگی هێز، پەیماننامەکان، دڵسۆزی سەردارەکان و یاساکانی حوکمڕانی</p>
+            <p className="text-xs text-stone-400">
+              دانوستانی چات لەگەڵ پاشاکان، پلەدارەکان و دەسەڵات، پەیمانی نهێنی و سیاسەتی نێودەوڵەتی
+            </p>
           </div>
         </div>
 
@@ -82,13 +105,13 @@ export const DiplomacyView: React.FC<DiplomacyViewProps> = ({
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 px-6 py-2.5 bg-stone-900 border-b border-stone-800 text-sm">
+      <div className="flex items-center gap-2 px-6 py-2.5 bg-stone-900 border-b border-stone-800 text-sm overflow-x-auto">
         <button
           onClick={() => {
             sfx.playClick();
             setTab('realms');
           }}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition whitespace-nowrap ${
             tab === 'realms'
               ? 'bg-amber-600/30 text-amber-300 border border-amber-500/50'
               : 'text-stone-400 hover:text-stone-200'
@@ -101,9 +124,24 @@ export const DiplomacyView: React.FC<DiplomacyViewProps> = ({
         <button
           onClick={() => {
             sfx.playClick();
+            setTab('dignitaries');
+          }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition whitespace-nowrap ${
+            tab === 'dignitaries'
+              ? 'bg-amber-600/30 text-amber-300 border border-amber-500/50'
+              : 'text-stone-400 hover:text-stone-200'
+          }`}
+        >
+          <Award className="w-4 h-4 text-purple-400" />
+          <span>پلەدارەکان و دەسەڵات لە بواری جیاواز</span>
+        </button>
+
+        <button
+          onClick={() => {
+            sfx.playClick();
             setTab('policies');
           }}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition whitespace-nowrap ${
             tab === 'policies'
               ? 'bg-amber-600/30 text-amber-300 border border-amber-500/50'
               : 'text-stone-400 hover:text-stone-200'
@@ -118,14 +156,14 @@ export const DiplomacyView: React.FC<DiplomacyViewProps> = ({
             sfx.playClick();
             setTab('lords');
           }}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition whitespace-nowrap ${
             tab === 'lords'
               ? 'bg-amber-600/30 text-amber-300 border border-amber-500/50'
               : 'text-stone-400 hover:text-stone-200'
           }`}
         >
           <Users className="w-4 h-4" />
-          سەردار و فەرماندەکان
+          سەردارەکان
         </button>
       </div>
 
@@ -137,7 +175,7 @@ export const DiplomacyView: React.FC<DiplomacyViewProps> = ({
             {/* Faction selector list */}
             <div className="space-y-2">
               <h3 className="text-xs uppercase tracking-wider text-stone-400 mb-2 font-bold">
-                {t.factionsList}
+                {t.factionsList} ({Object.keys(gameState.factions).length} دەسەڵاتدارێتی)
               </h3>
               {(Object.keys(gameState.factions) as FactionId[]).map((fId) => {
                 const fac = gameState.factions[fId];
@@ -233,10 +271,27 @@ export const DiplomacyView: React.FC<DiplomacyViewProps> = ({
                     {lang === 'ku' ? selectedFaction.descriptionKu : selectedFaction.description}
                   </p>
 
-                  <div className="bg-stone-950/60 border border-stone-800 rounded-xl p-3 mb-6 text-xs text-amber-300">
+                  <div className="bg-stone-950/60 border border-stone-800 rounded-xl p-3 mb-4 text-xs text-amber-300">
                     <span className="font-bold">تایبەتمەندی: </span>
                     {lang === 'ku' ? selectedFaction.specialtyKu : selectedFaction.specialty}
                   </div>
+
+                  {/* ROYAL AUDIENCE & CHAT CTA BUTTON */}
+                  {selectedFactionId !== 'player_kingdom' && (
+                    <button
+                      onClick={() => {
+                        sfx.playClick();
+                        setActiveAudience({
+                          targetType: 'king',
+                          faction: selectedFaction,
+                        });
+                      }}
+                      className="w-full mb-6 py-3.5 px-4 rounded-xl bg-gradient-to-r from-purple-700 via-amber-600 to-amber-500 hover:from-purple-600 hover:to-amber-400 text-stone-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-xl transition"
+                    >
+                      <MessageSquareQuote className="w-4 h-4 text-stone-950" />
+                      <span>دیدار و چاتی سیاسی لەگەڵ پاشا (Royal Audience & Secret Pacts)</span>
+                    </button>
+                  )}
 
                   {/* Active Treaties */}
                   <div className="mb-6">
@@ -266,7 +321,7 @@ export const DiplomacyView: React.FC<DiplomacyViewProps> = ({
                   {selectedFactionId !== 'player_kingdom' && (
                     <div className="border-t border-stone-800 pt-5">
                       <h4 className="text-xs uppercase tracking-wider text-stone-400 mb-3 font-bold">
-                        کردارە سیاسییەکانت بەرامبەر ئەم وڵاتە
+                        کردارە سیاسییە فەرمییەکان
                       </h4>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <button
@@ -321,16 +376,112 @@ export const DiplomacyView: React.FC<DiplomacyViewProps> = ({
           </div>
         )}
 
+        {/* DIGNITARIES & APPOINTED OFFICES TAB */}
+        {tab === 'dignitaries' && (
+          <div className="max-w-6xl mx-auto space-y-6">
+            <div className="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-bold text-amber-300 mb-1 flex items-center gap-2">
+                  <Award className="w-5 h-5 text-purple-400" />
+                  <span>پلەدارەکان و دەسەڵات لە بواری جیاواز (Dignitaries & Court Ministers)</span>
+                </h3>
+                <p className="text-xs text-stone-400 leading-relaxed">
+                  وەزیرەکان، دادوەران، فەرماندەکانی سوپا و سەرۆکی بازرگانان. دەتوانیت ڕاستەوخۆ بە چات گفتوگۆیان لەگەڵ بکەیت و ڕازیان بکەیت کە مۆڵەتی بازرگانی، پلەی ئەفسەری، یان مووچەی فەرمیت لە شارەکانیان پێببەخشن.
+                </p>
+              </div>
+
+              {/* Player Current Offices Held */}
+              <div className="p-3 bg-stone-950/80 rounded-xl border border-stone-800 shrink-0 text-xs text-right">
+                <span className="text-stone-400 block text-[11px]">پلە و مۆڵەتە بەدەستهاتووەکانت:</span>
+                <span className="font-bold text-amber-400">
+                  {player.appointedOffices?.length || 0} پلەی فەرمی
+                </span>
+              </div>
+            </div>
+
+            {/* Dignitaries Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.values(gameState.dignitaries).map((dig) => {
+                const fac = gameState.factions[dig.factionId];
+                const holdsThisOffice = player.appointedOffices?.some((o) => o.id === dig.id);
+
+                return (
+                  <div
+                    key={dig.id}
+                    className="p-5 rounded-2xl bg-stone-900 border border-stone-800 shadow-xl flex flex-col justify-between space-y-4 hover:border-stone-700 transition"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between border-b border-stone-800 pb-3">
+                        <div>
+                          <div className="font-bold text-sm text-stone-100">{dig.nameKu}</div>
+                          <div className="text-xs text-amber-400 font-medium">{dig.titleKu}</div>
+                          <div className="text-[11px] text-stone-400 mt-0.5">
+                            {fac?.nameKu}
+                          </div>
+                        </div>
+
+                        <div className="w-8 h-8 rounded-xl bg-purple-950/60 border border-purple-500/40 flex items-center justify-center text-purple-300">
+                          <Award className="w-4 h-4" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 pt-3 text-xs">
+                        <div className="p-2.5 rounded-xl bg-stone-950/60 border border-stone-800 text-stone-300 leading-relaxed text-[11px]">
+                          "{dig.dialogueGreetingKu}"
+                        </div>
+
+                        <div className="text-[11px] text-stone-400">
+                          <span className="font-bold text-stone-300">مەرج: </span>
+                          <span>{dig.requirementsKu}</span>
+                        </div>
+
+                        <div className="text-[11px] text-emerald-400 font-medium">
+                          <span className="font-bold text-stone-300">دەسەڵات و سوود: </span>
+                          <span>{dig.perkDescriptionKu}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-stone-800 pt-3">
+                      {holdsThisOffice ? (
+                        <div className="py-2.5 px-3 rounded-xl bg-emerald-950/60 border border-emerald-500/50 text-emerald-300 text-xs font-bold text-center flex items-center justify-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          <span>تۆ خاوەنی ئەم پلە و مۆڵەتەیت!</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            sfx.playClick();
+                            setActiveAudience({
+                              targetType: 'dignitary',
+                              faction: fac,
+                              dignitary: dig,
+                            });
+                          }}
+                          className="w-full py-2.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold text-xs transition flex items-center justify-center gap-2 shadow-lg"
+                        >
+                          <MessageSquareQuote className="w-4 h-4" />
+                          <span>دیدار و چاتی سیاسی لەگەڵ وەزیر</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* POLICIES TAB */}
         {tab === 'policies' && (
           <div className="max-w-4xl mx-auto space-y-4">
             <div className="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 mb-4 shadow-xl">
               <h3 className="text-base font-bold text-amber-300 mb-1 flex items-center gap-2">
                 <Scroll className="w-5 h-5 text-amber-400" />
-                {t.policiesTitle} (Imperial Decrees & Decrees)
+                {t.policiesTitle} (یاساکانی حوکمڕانی)
               </h3>
               <p className="text-xs text-stone-400">
-                یاسا و پەیڕەوەکان کاریگەری ڕاستەوخۆیان هەیە لەسەر داهات، باجی خەڵک، خێرایی سەربازگرتن و ناڕەزایەتی یان خۆشگوزەرانی هاوڵاتیان.
+                یاسا و پەیڕەوەکان کاریگەری ڕاستەوخۆیان لەسەر داهات، باجی خەڵک، سەربازگرتن و ناڕەزایەتی یان ئارامی هاوڵاتیان هەیە.
               </p>
             </div>
 
@@ -474,6 +625,20 @@ export const DiplomacyView: React.FC<DiplomacyViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Royal / Dignitary Audience Modal */}
+      {activeAudience && (
+        <AudienceModal
+          targetType={activeAudience.targetType}
+          faction={activeAudience.faction}
+          dignitary={activeAudience.dignitary}
+          gameState={gameState}
+          onClose={() => setActiveAudience(null)}
+          onSealSecretPact={onSealSecretPact}
+          onGrantOffice={onGrantOffice}
+          onBribeChamberlain={(cost) => onBribeChamberlain(activeAudience.faction.id, cost)}
+        />
+      )}
     </div>
   );
 };

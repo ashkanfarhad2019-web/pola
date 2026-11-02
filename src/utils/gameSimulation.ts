@@ -2,7 +2,7 @@
  * Game Simulation Engine: Dynamic AI, Economy, Movements, Upkeep & Diplomacy
  */
 import { FactionId, GameState, GoodId, Party, Settlement, TroopStack } from '../types/game';
-import { INITIAL_FACTIONS, INITIAL_LORDS, INITIAL_POLICIES, INITIAL_SETTLEMENTS, TRADE_GOODS, TROOP_CATALOG } from '../data/worldData';
+import { INITIAL_DIGNITARIES, INITIAL_FACTIONS, INITIAL_LORDS, INITIAL_NEWS, INITIAL_POLICIES, INITIAL_SETTLEMENTS, TRADE_GOODS, TROOP_CATALOG } from '../data/worldData';
 
 export function createInitialGameState(): GameState {
   // Initial player party setup: Starts completely alone with no army!
@@ -294,8 +294,14 @@ export function createInitialGameState(): GameState {
       fiefIds: [],
       workshops: [],
       activePolicies: ['royal_granaries'],
+      spies: [],
+      appointedOffices: [],
+      chamberlainBribes: {},
+      secretPacts: [],
     },
     policies: JSON.parse(JSON.stringify(INITIAL_POLICIES)),
+    dignitaries: JSON.parse(JSON.stringify(INITIAL_DIGNITARIES)),
+    news: JSON.parse(JSON.stringify(INITIAL_NEWS)),
     logs: [
       {
         id: 'log_start',
@@ -601,17 +607,49 @@ function processDailyUpkeep(state: GameState): { player: GameState['player']; lo
     });
   }
 
+  // Appointed offices salary
+  let officeSalaries = 0;
+  player.appointedOffices?.forEach((off) => {
+    officeSalaries += off.dailySalary;
+  });
+
+  // Spies upkeep & intelligence refresh
+  let spiesUpkeep = 0;
+  if (player.spies && player.spies.length > 0) {
+    player.spies.forEach((spy) => {
+      spiesUpkeep += spy.dailyUpkeep;
+      spy.infiltratedDays += 1;
+      const targetSettlement = state.settlements[spy.targetSettlementId];
+      if (targetSettlement) {
+        let garrisonCount = 0;
+        targetSettlement.garrison.forEach((g) => { garrisonCount += g.count; });
+        spy.lastIntel = {
+          garrisonCount,
+          foodDays: targetSettlement.foodReservesDays,
+          defenseLevel: targetSettlement.defenseLevel,
+          prosperity: targetSettlement.prosperity,
+          secretRumorKu: targetSettlement.foodReservesDays < 20 
+            ? 'خەڵکی شار بەهۆی کەمی ئازووقە لە لێواری یاخیبوونن.' 
+            : 'پاسەوانانی قەڵا لە دۆخی ئاساییدان و چاودێری دەروازەکان دەکەن.',
+          vulnerabilitiesKu: targetSettlement.defenseLevel < 4 
+            ? ['دیواری لاواز لە بەشی ڕۆژئاوا', 'دەروازەی دارین بە ئاسانی دەشکێت']
+            : ['بیری ئاوی دەرەوە لە مەترسی ژەهراویکردندایە'],
+        };
+      }
+    });
+  }
+
   // Net dinars change
-  const netIncome = workshopTotal + fiefTaxes - totalWages;
+  const netIncome = workshopTotal + fiefTaxes + officeSalaries - totalWages - spiesUpkeep;
   player.dinars = Math.max(0, player.dinars + netIncome);
 
-  if (totalWages > 0 || workshopTotal > 0 || fiefTaxes > 0) {
+  if (totalWages > 0 || workshopTotal > 0 || fiefTaxes > 0 || officeSalaries > 0 || spiesUpkeep > 0) {
     logs.push({
       id: `wages_${state.day}`,
       day: state.day,
       hour: state.hour,
-      textKu: `ڕاپۆرتی دارایی ڕۆژ: مەعاشی سوپا: -${totalWages} دینار | داهاتی کارگە و باج: +${workshopTotal + fiefTaxes} دینار. باڵانس: ${player.dinars}`,
-      textEn: `Daily Ledger: Troop Wages: -${totalWages} Dinars | Enterprise & Tax: +${workshopTotal + fiefTaxes} Dinars. Current Treasury: ${player.dinars}`,
+      textKu: `ڕاپۆرتی دارایی: مووچە و خەرجی: -${totalWages + spiesUpkeep} د | داهاتی کارگە، باج و پلەی فەرمی: +${workshopTotal + fiefTaxes + officeSalaries} د. باڵانس: ${player.dinars}`,
+      textEn: `Daily Ledger: Wages & Spies: -${totalWages + spiesUpkeep}d | Enterprise, Fief & Office: +${workshopTotal + fiefTaxes + officeSalaries}d. Treasury: ${player.dinars}`,
       type: 'fief',
     });
   }
