@@ -133,9 +133,28 @@ export const Battlefield3D: React.FC<Battlefield3DProps> = ({
     // If Siege: Construct Fortress Wall & Towers in background
     if (battle.isSiege) {
       const stoneMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 });
-      const wallMesh = new THREE.Mesh(new THREE.BoxGeometry(60, 8, 4), stoneMat);
-      wallMesh.position.set(0, 4, -25);
-      scene.add(wallMesh);
+      const breaches = battle.wallBreaches || 0;
+
+      if (breaches > 0) {
+        // Breached Wall: Left & Right segments with gap in the center
+        const leftWall = new THREE.Mesh(new THREE.BoxGeometry(22, 8, 4), stoneMat);
+        leftWall.position.set(-19, 4, -25);
+        scene.add(leftWall);
+
+        const rightWall = new THREE.Mesh(new THREE.BoxGeometry(22, 8, 4), stoneMat);
+        rightWall.position.set(19, 4, -25);
+        scene.add(rightWall);
+
+        // Stone Rubble in breach gap
+        const rubbleMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.95 });
+        const rubble = new THREE.Mesh(new THREE.BoxGeometry(14, 2.5, 6), rubbleMat);
+        rubble.position.set(0, 1.25, -25);
+        scene.add(rubble);
+      } else {
+        const wallMesh = new THREE.Mesh(new THREE.BoxGeometry(60, 8, 4), stoneMat);
+        wallMesh.position.set(0, 4, -25);
+        scene.add(wallMesh);
+      }
 
       // Towers
       [-30, 0, 30].forEach((tx) => {
@@ -480,6 +499,11 @@ export const Battlefield3D: React.FC<Battlefield3DProps> = ({
           <div className="text-xs text-stone-400">
             {battle.isSiege ? t.stormWalls : 'Tactical Command'}
           </div>
+          {battle.isSiege && battle.wallBreaches && battle.wallBreaches > 0 ? (
+            <div className="text-[11px] font-bold text-emerald-400 mt-0.5">
+              💥 {battle.wallBreaches} کەلێنی دیواری قەڵا شکاوە
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-3 bg-stone-900/90 border border-red-500/40 rounded-xl px-4 py-2 pointer-events-auto shadow-xl">

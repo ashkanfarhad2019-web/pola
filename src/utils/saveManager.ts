@@ -1,70 +1,22 @@
 /**
  * LocalStorage Save and Load Manager
- * Supports auto-save, multiple manual slots, and JSON export/import
+ * Unified interface powered by SaveLoadEngine
  */
 import { GameState } from '../types/game';
+import { SaveLoadEngine, SaveMetadata } from '../systems/SaveLoadEngine';
 
-export interface SaveMetadata {
-  slotId: string;
-  saveName: string;
-  savedAt: string;
-  day: number;
-  dinars: number;
-  troopCount: number;
-  factionsCount: number;
-  playerTitle: string;
-}
-
-const STORAGE_PREFIX = 'steel_crown_save_';
+export type { SaveMetadata };
 
 export function saveGameToStorage(slotId: string, state: GameState, slotName?: string): boolean {
-  try {
-    const totalTroops = state.player.troops.reduce((acc, t) => acc + t.count, 0);
-    const meta: SaveMetadata = {
-      slotId,
-      saveName: slotName || `Save ${slotId}`,
-      savedAt: new Date().toISOString(),
-      day: state.day,
-      dinars: state.player.dinars,
-      troopCount: totalTroops,
-      factionsCount: Object.keys(state.factions).length,
-      playerTitle: state.player.title,
-    };
-
-    localStorage.setItem(`${STORAGE_PREFIX}${slotId}_meta`, JSON.stringify(meta));
-    localStorage.setItem(`${STORAGE_PREFIX}${slotId}_data`, JSON.stringify(state));
-    return true;
-  } catch (err) {
-    console.error('Failed to save game to localStorage', err);
-    return false;
-  }
+  return SaveLoadEngine.saveGame(slotId, state, slotName);
 }
 
 export function loadGameFromStorage(slotId: string): GameState | null {
-  try {
-    const rawData = localStorage.getItem(`${STORAGE_PREFIX}${slotId}_data`);
-    if (!rawData) return null;
-    const parsed = JSON.parse(rawData) as GameState;
-    return parsed;
-  } catch (err) {
-    console.error('Failed to load game from localStorage', err);
-    return null;
-  }
+  return SaveLoadEngine.loadGame(slotId);
 }
 
 export function getSaveSlots(): (SaveMetadata | null)[] {
-  const slots = ['auto', 'slot1', 'slot2', 'slot3'];
-  return slots.map((s) => {
-    try {
-      const rawMeta = localStorage.getItem(`${STORAGE_PREFIX}${s}_meta`);
-      if (rawMeta) {
-        return JSON.parse(rawMeta) as SaveMetadata;
-      }
-    } catch {
-      return null;
-    }
-    return null;
-  });
+  return SaveLoadEngine.getSaveSlots();
 }
 
 export function exportSaveToFile(state: GameState) {
@@ -83,9 +35,10 @@ export function importSaveFromFile(file: File): Promise<GameState> {
     reader.onload = (e) => {
       try {
         const text = e.target?.result as string;
-        const parsed = JSON.parse(text) as GameState;
-        if (parsed.player && parsed.settlements && parsed.factions) {
-          resolve(parsed);
+        const parsed = JSON.parse(text);
+        const migrated = SaveLoadEngine.sanitizeAndMigrate(parsed);
+        if (migrated) {
+          resolve(migrated);
         } else {
           reject(new Error('Invalid save file structure'));
         }

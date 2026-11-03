@@ -119,6 +119,31 @@ export interface Workshop {
   cost: number;
 }
 
+export type SiegeEngineType = 'ladders' | 'ram' | 'catapult';
+
+export interface SiegeEngine {
+  id: string;
+  type: SiegeEngineType;
+  name: string;
+  nameKu: string;
+  progressDays: number;
+  totalDays: number;
+  timberCost: number;
+  isReady: boolean;
+}
+
+export interface SiegeCampState {
+  settlementId: string;
+  besiegerPartyId: string;
+  startDay: number;
+  daysBesieged: number;
+  activeConstruction?: SiegeEngine;
+  engines: SiegeEngine[];
+  wallBreaches: number; // 0 to 2
+  surrenderWillingness: number; // 0 to 100%
+  blockadeIntegrity: number; // 0 to 100%
+}
+
 export interface Settlement {
   id: string;
   name: string;
@@ -139,6 +164,7 @@ export interface Settlement {
   workshops: Workshop[];
   underSiegeBy?: string; // Party ID or Faction
   siegeDays?: number;
+  siegeCamp?: SiegeCampState;
 }
 
 export interface Party {
@@ -161,6 +187,7 @@ export interface Party {
   bannerColor: string;
   statusText?: string;
   statusTextKu?: string;
+  besiegingSettlementId?: string;
 }
 
 export interface RealmPolicy {
@@ -254,6 +281,7 @@ export interface PlayerCharacter {
     termsKu: string;
     active: boolean;
   }>;
+  isBesiegingSettlementId?: string;
 }
 
 export interface CombatUnit {
@@ -288,6 +316,8 @@ export interface BattleState {
   lootDinars: number;
   lootItems: Partial<Record<GoodId, number>>;
   capturedPrisoners: TroopStack[];
+  siegeEngines?: SiegeEngine[];
+  wallBreaches?: number;
 }
 
 export interface GameLogMessage {

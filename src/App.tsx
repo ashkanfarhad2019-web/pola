@@ -8,7 +8,7 @@ import { createInitialGameState, simulateTick } from './utils/gameSimulation';
 import { loadGameFromStorage, saveGameToStorage } from './utils/saveManager';
 import { Language, TRANSLATIONS } from './localization/translations';
 import { sfx } from './audio/soundFx';
-import { WorldMap3D } from './components/WorldMap3D';
+import { WorldMap3D, MapCameraControls } from './components/WorldMap3D';
 import { TacticalHUD } from './components/TacticalHUD';
 import { CityView } from './components/CityView';
 import { PartyView } from './components/PartyView';
@@ -18,7 +18,11 @@ import { SaveLoadModal } from './components/SaveLoadModal';
 import { TitleScreen } from './components/TitleScreen';
 import { LogView } from './components/LogView';
 import { NewsIntelligenceView } from './components/NewsIntelligenceView';
+import { SiegeCampModal } from './components/SiegeCampModal';
+import { MilitaryEngine } from './systems/MilitaryEngine';
+import { GameEventBus } from './systems/interfaces';
 import { TRADE_GOODS, TROOP_CATALOG } from './data/worldData';
+import { SiegeEngine, SiegeEngineType } from './types/game';
 
 export default function App() {
   const [screen, setScreen] = useState<'title' | 'playing'>('title');
@@ -27,8 +31,11 @@ export default function App() {
   const [saveModalOpen, setSaveModalOpen] = useState<boolean>(false);
 
   // Active overlay view on top of 3D map
-  const [activeView, setActiveView] = useState<'map' | 'city' | 'party' | 'diplomacy' | 'news' | 'log'>('map');
+  const [activeView, setActiveView] = useState<'map' | 'city' | 'party' | 'diplomacy' | 'news' | 'log' | 'siege_camp'>('map');
   const [currentSettlementId, setCurrentSettlementId] = useState<string | null>(null);
+  const [selectedSettlementId, setSelectedSettlementId] = useState<string | null>(null);
+  const [activeSiegeSettlementId, setActiveSiegeSettlementId] = useState<string | null>(null);
+  const [cameraControls, setCameraControls] = useState<MapCameraControls | null>(null);
 
   // Check if save file exists in storage
   const [hasExistingSave, setHasExistingSave] = useState<boolean>(() => {
@@ -70,6 +77,7 @@ export default function App() {
         next.arrivedAtSettlementId = undefined;
         sfx.playCityEnter();
         setCurrentSettlementId(arrivingId);
+        setSelectedSettlementId(null);
         setActiveView('city');
       }
 
@@ -104,30 +112,33 @@ export default function App() {
     });
   };
 
-  // Handle selecting a settlement on map
+  // Handle selecting a settlement on map: opens contextual settlement inspector panel
   const handleSelectSettlement = (settlementId: string) => {
     const settlement = gameState.settlements[settlementId];
     if (!settlement) return;
+    sfx.playClick();
+    setSelectedSettlementId(settlementId);
+  };
 
-    // Check distance between player and settlement
-    const playerParty = gameState.parties['player_party'];
-    const dist = Math.hypot(playerParty.x - settlement.x, playerParty.z - settlement.z);
+  // Direct march to settlement from the inspector panel
+  const handleMarchToSettlement = (settlementId: string) => {
+    const settlement = gameState.settlements[settlementId];
+    if (!settlement) return;
+    sfx.playTroopMarch();
+    const settlementName = lang === 'ku' ? settlement.nameKu : settlement.name;
+    handleSetDestination(settlement.x, settlement.z, settlementId);
+    setGameState((prev) => ({
+      ...prev,
+      targetDestinationName: settlementName,
+    }));
+  };
 
-    if (dist <= 3.5) {
-      // Close enough to enter directly
-      sfx.playCityEnter();
-      setCurrentSettlementId(settlementId);
-      setActiveView('city');
-    } else {
-      // Order party to march to this settlement, and when arrived directly enter
-      sfx.playTroopMarch();
-      const settlementName = lang === 'ku' ? settlement.nameKu : settlement.name;
-      handleSetDestination(settlement.x, settlement.z, settlementId);
-      setGameState((prev) => ({
-        ...prev,
-        targetDestinationName: settlementName,
-      }));
-    }
+  // Enter settlement directly from inspector
+  const handleEnterSettlement = (settlementId: string) => {
+    sfx.playCityEnter();
+    setCurrentSettlementId(settlementId);
+    setSelectedSettlementId(null);
+    setActiveView('city');
   };
 
   // Handle interacting with an AI Party (Lord, Caravan, Bandit)
@@ -231,7 +242,11 @@ export default function App() {
   };
 
   // Start Siege assault
-  const handleInitiateSiege = (settlementId: string) => {
+  const handleInitiateSiege = (
+    settlementId: string,
+    customEngines?: SiegeEngine[],
+    wallBreaches?: number
+  ) => {
     const s = gameState.settlements[settlementId];
     if (!s) return;
 
@@ -314,8 +329,80 @@ export default function App() {
         lootDinars: Math.floor(s.population * 0.15),
         lootItems: { grain: 20, weapons: 5 },
         capturedPrisoners: [],
+        siegeEngines: customEngines || s.siegeCamp?.engines,
+        wallBreaches: wallBreaches !== undefined ? wallBreaches : (s.siegeCamp?.wallBreaches || 0),
       },
     }));
+  };
+
+  // Advanced Siege Camp Handlers
+  const handleStartSiegeCamp = (settlementId: string) => {
+    const militaryEngine = new MilitaryEngine();
+    const eventBus = GameEventBus.getInstance();
+    const result = militaryEngine.startSiegeCamp(gameState, settlementId, 'player_party', eventBus);
+    setGameState((prev) => ({
+      ...prev,
+      settlements: { ...prev.settlements, [settlementId]: result.settlement },
+      parties: { ...prev.parties, player_party: result.party },
+      player: result.player,
+      logs: [result.log, ...prev.logs.slice(0, 45)],
+    }));
+    setActiveSiegeSettlementId(settlementId);
+    setActiveView('siege_camp');
+  };
+
+  const handleQueueSiegeEngine = (settlementId: string, engineType: SiegeEngineType) => {
+    const militaryEngine = new MilitaryEngine();
+    const eventBus = GameEventBus.getInstance();
+    const result = militaryEngine.queueSiegeEngine(gameState, settlementId, engineType, eventBus);
+    if (result.success) {
+      setGameState((prev) => ({
+        ...prev,
+        settlements: { ...prev.settlements, [settlementId]: result.settlement },
+        player: result.player,
+      }));
+    }
+  };
+
+  const handleDemandSurrender = (settlementId: string) => {
+    const militaryEngine = new MilitaryEngine();
+    const eventBus = GameEventBus.getInstance();
+    const result = militaryEngine.executeSurrender(gameState, settlementId, eventBus);
+    if (result.success) {
+      setGameState((prev) => ({
+        ...prev,
+        settlements: { ...prev.settlements, [settlementId]: result.settlement },
+        player: result.player,
+        logs: [result.log, ...prev.logs.slice(0, 45)],
+      }));
+      setActiveSiegeSettlementId(null);
+      setCurrentSettlementId(settlementId);
+      setActiveView('city');
+    }
+  };
+
+  const handleAbandonSiege = (settlementId: string) => {
+    const militaryEngine = new MilitaryEngine();
+    const eventBus = GameEventBus.getInstance();
+    const result = militaryEngine.abandonSiegeCamp(gameState, settlementId, eventBus);
+    setGameState((prev) => ({
+      ...prev,
+      settlements: { ...prev.settlements, [settlementId]: result.settlement },
+      parties: { ...prev.parties, player_party: result.party },
+      player: result.player,
+      logs: [result.log, ...prev.logs.slice(0, 45)],
+    }));
+    setActiveSiegeSettlementId(null);
+    setActiveView('map');
+  };
+
+  const handleOrderAssault = (settlementId: string) => {
+    const s = gameState.settlements[settlementId];
+    const engines = s?.siegeCamp?.engines;
+    const breaches = s?.siegeCamp?.wallBreaches || 0;
+    setActiveSiegeSettlementId(null);
+    setActiveView('map');
+    handleInitiateSiege(settlementId, engines, breaches);
   };
 
   // Finish Battle callback (Victory or Defeat)
@@ -342,6 +429,11 @@ export default function App() {
               { troopId: 'footman', count: 20, wounded: 0 },
               { troopId: 'militia_archer', count: 15, wounded: 0 },
             ];
+            // Clear any active siege camp
+            settlement.siegeCamp = undefined;
+            settlement.underSiegeBy = undefined;
+            settlement.siegeDays = undefined;
+            next.player.isBesiegingSettlementId = undefined;
 
             if (!next.player.fiefIds.includes(settlement.id)) {
               next.player.fiefIds.push(settlement.id);
@@ -366,6 +458,16 @@ export default function App() {
         // Player defeated: loses 30% dinars and surviving mercenaries scatter
         next.player.dinars = Math.max(20, Math.floor(next.player.dinars * 0.7));
         next.player.troops = [];
+
+        if (b?.isSiege && b.enemySettlementId) {
+          const settlement = next.settlements[b.enemySettlementId];
+          if (settlement) {
+            settlement.siegeCamp = undefined;
+            settlement.underSiegeBy = undefined;
+            settlement.siegeDays = undefined;
+          }
+          next.player.isBesiegingSettlementId = undefined;
+        }
       }
 
       next.battle = undefined;
@@ -878,19 +980,36 @@ export default function App() {
             onSelectSettlement={handleSelectSettlement}
             onSelectParty={handleSelectParty}
             onSetDestination={handleSetDestination}
+            onRegisterCameraControls={setCameraControls}
           />
 
-          {/* Tactical HUD */}
+          {/* Tactical HUD & Unified Navigation Rail */}
           <TacticalHUD
             gameState={gameState}
             lang={lang}
             activeView={activeView}
             currentSettlementId={currentSettlementId}
-            onOpenView={(view) => setActiveView(view)}
+            selectedSettlementId={selectedSettlementId}
+            cameraControls={cameraControls}
+            onSelectSettlement={setSelectedSettlementId}
+            onEnterSettlement={handleEnterSettlement}
+            onMarchToSettlement={handleMarchToSettlement}
+            onOpenView={(view) => {
+              if (view === 'siege_camp' && gameState.player.isBesiegingSettlementId) {
+                setActiveSiegeSettlementId(gameState.player.isBesiegingSettlementId);
+              }
+              setActiveView(view);
+            }}
             onOpenSaveModal={() => setSaveModalOpen(true)}
             onChangeSpeed={(spd) => {
               setGameState((prev) => ({ ...prev, timeSpeed: spd }));
             }}
+            onOpenSiegeCamp={(sId) => {
+              setActiveSiegeSettlementId(sId);
+              setActiveView('siege_camp');
+            }}
+            onStartSiegeCamp={handleStartSiegeCamp}
+            onInitiateSiege={(sId) => handleInitiateSiege(sId)}
           />
 
           {/* CITY / CASTLE VIEW MODAL */}
@@ -906,6 +1025,25 @@ export default function App() {
               onBuyWorkshop={handleBuyWorkshop}
               onInitiateSiege={handleInitiateSiege}
               onChangeTaxRate={handleChangeTaxRate}
+              onOpenSiegeCamp={(sId) => {
+                setActiveSiegeSettlementId(sId);
+                setActiveView('siege_camp');
+              }}
+              onStartSiegeCamp={handleStartSiegeCamp}
+            />
+          )}
+
+          {/* ADVANCED SIEGE CAMP OPERATIONS MODAL */}
+          {activeView === 'siege_camp' && activeSiegeSettlementId && gameState.settlements[activeSiegeSettlementId] && (
+            <SiegeCampModal
+              settlement={gameState.settlements[activeSiegeSettlementId]}
+              gameState={gameState}
+              lang={lang}
+              onClose={() => setActiveView('map')}
+              onQueueEngine={handleQueueSiegeEngine}
+              onDemandSurrender={handleDemandSurrender}
+              onOrderAssault={handleOrderAssault}
+              onAbandonSiege={handleAbandonSiege}
             />
           )}
 

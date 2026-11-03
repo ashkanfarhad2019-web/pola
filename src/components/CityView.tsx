@@ -20,7 +20,8 @@ import {
   X,
   Plus,
   Minus,
-  Sparkles
+  Sparkles,
+  Swords
 } from 'lucide-react';
 
 interface CityViewProps {
@@ -34,6 +35,8 @@ interface CityViewProps {
   onBuyWorkshop: (settlementId: string, workshopType: Workshop['type']) => void;
   onInitiateSiege: (settlementId: string) => void;
   onChangeTaxRate: (settlementId: string, rate: Settlement['taxRate']) => void;
+  onOpenSiegeCamp?: (settlementId: string) => void;
+  onStartSiegeCamp?: (settlementId: string) => void;
 }
 
 export const CityView: React.FC<CityViewProps> = ({
@@ -47,6 +50,8 @@ export const CityView: React.FC<CityViewProps> = ({
   onBuyWorkshop,
   onInitiateSiege,
   onChangeTaxRate,
+  onOpenSiegeCamp,
+  onStartSiegeCamp,
 }) => {
   const t = TRANSLATIONS[lang];
   // 'hub' = main menu, 'market', 'tavern', 'keep', 'workshops', 'siege'
@@ -640,17 +645,62 @@ export const CityView: React.FC<CityViewProps> = ({
                 </div>
               </div>
 
-              <button
-                disabled={playerTroopCount < 10}
-                onClick={() => {
-                  sfx.playWarHorn();
-                  onInitiateSiege(settlement.id);
-                }}
-                className="w-full py-4 bg-gradient-to-r from-red-700 to-red-800 hover:from-red-600 hover:to-red-700 disabled:opacity-40 text-white font-extrabold rounded-2xl text-sm transition shadow-2xl border border-red-500 flex items-center justify-center gap-2"
-              >
-                <ShieldAlert className="w-5 h-5" />
-                <span>هێرشکردنە سەر شووراکانی شار (دەستپێکردنی شەڕ)!</span>
-              </button>
+              {settlement.siegeCamp ? (
+                <div className="p-4 rounded-2xl bg-amber-950/50 border border-amber-600/50 space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-amber-300">
+                      کەمپی گەمارۆدان چالاکە (ڕۆژی {settlement.siegeCamp.daysBesieged})
+                    </span>
+                    <span className="text-stone-400">
+                      ئازووقەی شار: {settlement.foodReservesDays} ڕۆژ
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-300 leading-relaxed">
+                    ئامێرەکانی گەمارۆدان (پەیژە، کۆتەک، مەنجەنیق) لە کەمپەکەدا بنیاد دەنرێن و خەڵک برسی دەبن.
+                  </p>
+                  <button
+                    onClick={() => {
+                      sfx.playClick();
+                      onOpenSiegeCamp?.(settlement.id);
+                    }}
+                    className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <ShieldAlert className="w-4 h-4" />
+                    <span>چوونە ناو کەمپی گەمارۆدان (Siege Camp Operations)</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <button
+                    disabled={playerTroopCount < 10}
+                    onClick={() => {
+                      sfx.playWarHorn();
+                      onStartSiegeCamp?.(settlement.id);
+                    }}
+                    className="w-full py-3.5 bg-gradient-to-r from-amber-700 to-amber-800 hover:from-amber-600 hover:to-amber-700 disabled:opacity-40 text-white font-bold rounded-2xl text-xs transition shadow-xl border border-amber-500 flex items-center justify-center gap-2"
+                  >
+                    <ShieldAlert className="w-4 h-4 text-amber-300" />
+                    <span>دامەزراندنی کەمپی گەمارۆدان (Starve & Build Siege Engines)</span>
+                  </button>
+                  <p className="text-[11px] text-stone-400 text-center">
+                    دامەزراندنی کەمپ ڕێگە دەدات ئازووقە ببڕیت، مەنجەنیق دروست بکەیت و دیوار بڕووخێنیت تا تەسلیم ببن.
+                  </p>
+                </div>
+              )}
+
+              <div className="border-t border-stone-800 pt-3">
+                <button
+                  disabled={playerTroopCount < 10}
+                  onClick={() => {
+                    sfx.playWarHorn();
+                    onInitiateSiege(settlement.id);
+                  }}
+                  className="w-full py-3 bg-gradient-to-r from-red-700 to-red-800 hover:from-red-600 hover:to-red-700 disabled:opacity-40 text-white font-extrabold rounded-2xl text-xs transition shadow-xl border border-red-500 flex items-center justify-center gap-2"
+                >
+                  <Swords className="w-4 h-4" />
+                  <span>هێرشی ڕاستەوخۆی شوورا (Direct Storming Assault)</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

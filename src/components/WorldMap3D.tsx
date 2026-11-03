@@ -19,11 +19,20 @@ import {
   Compass
 } from 'lucide-react';
 
+export interface MapCameraControls {
+  focusPlayer: () => void;
+  fullOverview: () => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  isFollowing: boolean;
+}
+
 interface WorldMap3DProps {
   gameState: GameState;
   onSelectSettlement: (settlementId: string) => void;
   onSelectParty: (partyId: string) => void;
   onSetDestination: (x: number, z: number, targetSettlementId?: string, targetPartyId?: string) => void;
+  onRegisterCameraControls?: (controls: MapCameraControls) => void;
 }
 
 export const WorldMap3D: React.FC<WorldMap3DProps> = ({
@@ -31,6 +40,7 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
   onSelectSettlement,
   onSelectParty,
   onSetDestination,
+  onRegisterCameraControls,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef(gameState);
@@ -75,6 +85,18 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
     sfx.playClick();
     zoomLevelRef.current = Math.max(0.65, Math.min(3.4, zoomLevelRef.current + delta));
   };
+
+  useEffect(() => {
+    if (onRegisterCameraControls) {
+      onRegisterCameraControls({
+        focusPlayer: handleFocusPlayer,
+        fullOverview: handleFullMapOverview,
+        zoomIn: () => handleZoom(-0.35),
+        zoomOut: () => handleZoom(0.35),
+        isFollowing,
+      });
+    }
+  }, [isFollowing, onRegisterCameraControls]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -449,12 +471,18 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
         ctx.fillText(iconPrefix + s.nameKu, 128, 42);
 
         // Subtitle tag
-        ctx.fillStyle = isPlayerOwned ? '#e2e8f0' : '#cbd5e1';
-        ctx.font = 'bold 17px sans-serif';
-        const tagText = isPlayerOwned 
-          ? (s.type === 'town' ? 'شاری تۆ (ڕەش)' : 'قەڵای تۆ (ڕەش)')
-          : (s.type === 'town' ? 'شار' : 'قەڵا');
-        ctx.fillText(tagText, 128, 72);
+        if (s.siegeCamp) {
+          ctx.fillStyle = '#f87171';
+          ctx.font = 'bold 16px sans-serif';
+          ctx.fillText(`⚔️ گەمارۆدراوە (ڕۆژی ${s.siegeCamp.daysBesieged})`, 128, 72);
+        } else {
+          ctx.fillStyle = isPlayerOwned ? '#e2e8f0' : '#cbd5e1';
+          ctx.font = 'bold 17px sans-serif';
+          const tagText = isPlayerOwned 
+            ? (s.type === 'town' ? 'شاری تۆ (ڕەش)' : 'قەڵای تۆ (ڕەش)')
+            : (s.type === 'town' ? 'شار' : 'قەڵا');
+          ctx.fillText(tagText, 128, 72);
+        }
       }
 
       const texture = new THREE.CanvasTexture(canvas);
@@ -482,6 +510,7 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
       badgeSprite: THREE.Sprite;
       currentFactionId: string;
       isPlayerOwned: boolean;
+      hasSiegeCamp?: boolean;
     }
     const settlementMeshMap = new Map<string, SettlementMeshRecord>();
 
@@ -843,9 +872,11 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
       Object.values(currentSettlements).forEach((s) => {
         const rec = settlementMeshMap.get(s.id);
         const isPlayerOwned = s.factionId === 'player_kingdom' || s.lordOwnerId === 'player';
-        if (rec && (rec.currentFactionId !== s.factionId || rec.isPlayerOwned !== isPlayerOwned)) {
+        const hasSiege = !!s.siegeCamp;
+        if (rec && (rec.currentFactionId !== s.factionId || rec.isPlayerOwned !== isPlayerOwned || rec.hasSiegeCamp !== hasSiege)) {
           rec.currentFactionId = s.factionId;
           rec.isPlayerOwned = isPlayerOwned;
+          rec.hasSiegeCamp = hasSiege;
           const faction = stateRef.current.factions[s.factionId];
           const factionColor = isPlayerOwned ? '#0c0c0e' : (faction ? faction.color : '#ffffff');
           const wallColor = isPlayerOwned 
@@ -987,53 +1018,6 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
         ref={containerRef}
         className="w-full h-full cursor-grab active:cursor-grabbing touch-none"
       />
-
-      {/* Clean, Non-Intrusive Navigation Pills in Top-Right */}
-      <div className="absolute top-16 right-3 sm:right-6 z-20 flex flex-col items-end gap-2 pointer-events-auto">
-        <div className="flex items-center gap-1.5 bg-stone-900/90 border border-stone-800 rounded-2xl p-1 shadow-2xl backdrop-blur-none">
-          {/* Zoom In button */}
-          <button
-            onClick={() => handleZoom(-0.35)}
-            className="w-8 h-8 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-300 flex items-center justify-center transition active:scale-95"
-            title="نزیککردنەوە"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-
-          {/* Zoom Out button */}
-          <button
-            onClick={() => handleZoom(0.35)}
-            className="w-8 h-8 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-300 flex items-center justify-center transition active:scale-95"
-            title="دوورخستنەوە"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-
-          {/* Full Continent Overview */}
-          <button
-            onClick={handleFullMapOverview}
-            className="px-3 py-1.5 rounded-xl bg-purple-950/80 hover:bg-purple-900 text-purple-200 text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
-            title="بینینی تەواوی ماپ"
-          >
-            <Eye className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">تەواوی ماپ</span>
-          </button>
-
-          {/* Center Character Focus */}
-          <button
-            onClick={handleFocusPlayer}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95 ${
-              isFollowing
-                ? 'bg-emerald-600 text-white'
-                : 'bg-stone-800 text-stone-300 hover:text-emerald-300'
-            }`}
-            title="گەڕانەوە بۆ سەر کارەکتەر"
-          >
-            <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden sm:inline">کارەکتەر</span>
-          </button>
-        </div>
-      </div>
 
       {/* Target Destination notification banner at top */}
       {gameState.targetDestinationName && (
