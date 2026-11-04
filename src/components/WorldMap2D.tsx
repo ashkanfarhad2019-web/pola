@@ -29,6 +29,7 @@ import {
 
 interface WorldMap2DProps {
   gameState: GameState;
+  selectedSettlementId?: string | null;
   onSelectSettlement: (settlementId: string) => void;
   onSelectParty: (partyId: string) => void;
   onSetDestination: (x: number, z: number, targetSettlementId?: string, targetPartyId?: string) => void;
@@ -41,6 +42,7 @@ const MAP_IMAGE_SRC = '/assets/aistudio/photo_2026-11-04_21-36-06_288080ea.jpg';
 
 export const WorldMap2D: React.FC<WorldMap2DProps> = ({
   gameState,
+  selectedSettlementId,
   onSelectSettlement,
   onSelectParty,
   onSetDestination,
@@ -352,22 +354,46 @@ export const WorldMap2D: React.FC<WorldMap2DProps> = ({
     };
   }, [handleFocusPlayer, handleFullOverview, handleZoom]);
 
-  // Touch and Mouse handlers for fluid Pan & Pinch-Zoom
+  // Touch, Pointer, and Pinch-Zoom handlers
+  const pointerDownTimeRef = useRef<number>(0);
+  const activeTouchesRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+
   const handlePointerDown = (e: React.PointerEvent) => {
-    if (e.pointerType === 'touch') {
-      // Touch start
-    }
-    isDraggingRef.current = false;
     pointerDownPosRef.current = { x: e.clientX, y: e.clientY };
+    pointerDownTimeRef.current = performance.now();
+    isDraggingRef.current = false;
     panStartRef.current = { ...pan };
+
+    activeTouchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (activeTouchesRef.current.size === 2) {
+      const touches = Array.from(activeTouchesRef.current.values());
+      initialPinchDistRef.current = Math.hypot(touches[0].x - touches[1].x, touches[0].y - touches[1].y);
+      initialPinchZoomRef.current = zoom;
+    }
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
+    activeTouchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    // Handle 2-finger pinch zoom on mobile
+    if (activeTouchesRef.current.size === 2) {
+      const touches = Array.from(activeTouchesRef.current.values());
+      const currentDist = Math.hypot(touches[0].x - touches[1].x, touches[0].y - touches[1].y);
+      if (initialPinchDistRef.current > 0) {
+        const scaleChange = currentDist / initialPinchDistRef.current;
+        const newZoom = Math.max(0.65, Math.min(3.2, initialPinchZoomRef.current * scaleChange));
+        setZoom(newZoom);
+        setIsFollowing(false);
+      }
+      return;
+    }
+
     const dx = e.clientX - pointerDownPosRef.current.x;
     const dy = e.clientY - pointerDownPosRef.current.y;
     const dist = Math.hypot(dx, dy);
 
-    if (dist > 6) {
+    if (dist > 8) {
       isDraggingRef.current = true;
       if (isFollowingRef.current) {
         setIsFollowing(false);
@@ -380,19 +406,69 @@ export const WorldMap2D: React.FC<WorldMap2DProps> = ({
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    // If not dragging, it was a click on the map!
-    if (!isDraggingRef.current) {
-      const container = containerRef.current;
-      if (!container) return;
+    activeTouchesRef.current.delete(e.pointerId);
 
+    const container = containerRef.current;
+    if (!container) return;
+
+    const dx = e.clientX - pointerDownPosRef.current.x;
+    const dy = e.clientY - pointerDownPosRef.current.y;
+    const dragDistance = Math.hypot(dx, dy);
+    const duration = performance.now() - pointerDownTimeRef.current;
+
+    // Distinguish between dragging and tapping (touch friendly 10px threshold)
+    if (!isDraggingRef.current && dragDistance < 10 && duration < 600) {
       const rect = container.getBoundingClientRect();
       const clickClientX = e.clientX - rect.left;
       const clickClientY = e.clientY - rect.top;
 
-      // Convert client click to Map percentage (0 - 100)
+      // Convert client tap to map coordinate space
       const mapPixelX = (clickClientX - pan.x) / zoom;
       const mapPixelY = (clickClientY - pan.y) / zoom;
 
+      // 1. Proximity check: did user tap on or near any settlement? (32px radius)
+      let nearestSettlement: Settlement | null = null;
+      let minSettlementDist = 32;
+
+      Object.values(gameState.settlements).forEach((s) => {
+        const sx = (s.x / 100) * MAP_WIDTH;
+        const sy = (s.z / 100) * MAP_HEIGHT;
+        const d = Math.hypot(mapPixelX - sx, mapPixelY - sy);
+        if (d < minSettlementDist) {
+          minSettlementDist = d;
+          nearestSettlement = s;
+        }
+      });
+
+      if (nearestSettlement) {
+        sfx.playClick();
+        onSelectSettlement((nearestSettlement as Settlement).id);
+        handlePanTo((nearestSettlement as Settlement).x, (nearestSettlement as Settlement).z);
+        return;
+      }
+
+      // 2. Proximity check: did user tap near an AI party? (24px radius)
+      let nearestParty: Party | null = null;
+      let minPartyDist = 24;
+
+      Object.values(gameState.parties).forEach((p) => {
+        if (p.id === 'player_party') return;
+        const px = (p.x / 100) * MAP_WIDTH;
+        const py = (p.z / 100) * MAP_HEIGHT;
+        const d = Math.hypot(mapPixelX - px, mapPixelY - py);
+        if (d < minPartyDist) {
+          minPartyDist = d;
+          nearestParty = p;
+        }
+      });
+
+      if (nearestParty) {
+        sfx.playClick();
+        onSelectParty((nearestParty as Party).id);
+        return;
+      }
+
+      // 3. Otherwise: march order to tapped terrain coordinate
       if (mapPixelX >= 0 && mapPixelX <= MAP_WIDTH && mapPixelY >= 0 && mapPixelY <= MAP_HEIGHT) {
         const normX = Math.max(2, Math.min(98, (mapPixelX / MAP_WIDTH) * 100));
         const normZ = Math.max(2, Math.min(98, (mapPixelY / MAP_HEIGHT) * 100));
@@ -435,6 +511,10 @@ export const WorldMap2D: React.FC<WorldMap2DProps> = ({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={() => {
+        activeTouchesRef.current.clear();
+        isDraggingRef.current = false;
+      }}
       onWheel={handleWheel}
       className="absolute inset-0 w-full h-full overflow-hidden select-none touch-none bg-[#14120e] cursor-grab active:cursor-grabbing"
     >
@@ -465,19 +545,83 @@ export const WorldMap2D: React.FC<WorldMap2DProps> = ({
         <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_80px_rgba(0,0,0,0.5)] border border-amber-950/40" />
 
         {/* =========================================================================
-            2. DESTINATION BEACON (When marching)
+            2. ROAD NETWORK MOVEMENT TRAILS (SVG Layer)
            ========================================================================= */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none z-10"
+          viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
+        >
+          <defs>
+            <linearGradient id="marchPathGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#d97706" stopOpacity="0.4" />
+            </linearGradient>
+            <filter id="glowGold" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="2" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+
+          {/* Player March Route line */}
+          {playerParty && playerParty.targetX !== undefined && playerParty.targetZ !== undefined && (
+            <g filter="url(#glowGold)">
+              {/* Waypoints line */}
+              {playerParty.pathWaypoints && playerParty.pathWaypoints.length > 0 ? (
+                <>
+                  <polyline
+                    points={[
+                      `${(playerParty.x / 100) * MAP_WIDTH},${(playerParty.z / 100) * MAP_HEIGHT}`,
+                      ...playerParty.pathWaypoints.map(
+                        (wp) => `${(wp.x / 100) * MAP_WIDTH},${(wp.z / 100) * MAP_HEIGHT}`
+                      ),
+                    ].join(' ')}
+                    fill="none"
+                    stroke="url(#marchPathGrad)"
+                    strokeWidth="3"
+                    strokeDasharray="6, 4"
+                    strokeLinecap="round"
+                    className="animate-pulse"
+                  />
+                  {playerParty.pathWaypoints.map((wp, idx) => (
+                    <circle
+                      key={idx}
+                      cx={(wp.x / 100) * MAP_WIDTH}
+                      cy={(wp.z / 100) * MAP_HEIGHT}
+                      r="2.5"
+                      fill="#fbbf24"
+                      stroke="#18181b"
+                      strokeWidth="1"
+                    />
+                  ))}
+                </>
+              ) : (
+                <line
+                  x1={(playerParty.x / 100) * MAP_WIDTH}
+                  y1={(playerParty.z / 100) * MAP_HEIGHT}
+                  x2={(playerParty.targetX / 100) * MAP_WIDTH}
+                  y2={(playerParty.targetZ / 100) * MAP_HEIGHT}
+                  stroke="url(#marchPathGrad)"
+                  strokeWidth="2.5"
+                  strokeDasharray="5, 3"
+                  strokeLinecap="round"
+                />
+              )}
+            </g>
+          )}
+        </svg>
+
+        {/* Destination Beacon */}
         {playerParty && playerParty.targetX !== undefined && playerParty.targetZ !== undefined && (
           <div
             style={{
               left: `${(playerParty.targetX / 100) * MAP_WIDTH}px`,
               top: `${(playerParty.targetZ / 100) * MAP_HEIGHT}px`,
             }}
-            className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10"
+            className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-15"
           >
             <div className="relative flex items-center justify-center">
-              <div className="w-8 h-8 rounded-full border-2 border-amber-400 animate-ping opacity-75" />
-              <div className="absolute w-4 h-4 rounded-full bg-amber-400/50 border border-white flex items-center justify-center text-[8px] text-stone-950 font-bold">
+              <div className="w-9 h-9 rounded-full border-2 border-amber-400 animate-ping opacity-75" />
+              <div className="absolute w-5 h-5 rounded-full bg-amber-400/80 border-2 border-stone-950 flex items-center justify-center text-[9px] shadow-lg text-stone-950 font-bold">
                 🎯
               </div>
             </div>
@@ -485,7 +629,7 @@ export const WorldMap2D: React.FC<WorldMap2DProps> = ({
         )}
 
         {/* =========================================================================
-            3. INTERACTIVE CASTLES, CITIES & SETTLEMENTS (Aligned to image locations)
+            3. INTERACTIVE CASTLES, CITIES & SETTLEMENTS (Phase 2 & 5)
            ========================================================================= */}
         {Object.values(gameState.settlements).map((s) => {
           const posX = (s.x / 100) * MAP_WIDTH;
@@ -495,6 +639,7 @@ export const WorldMap2D: React.FC<WorldMap2DProps> = ({
           const bannerColor = isPlayerOwned ? '#18181b' : faction?.color || '#2563eb';
           const garrisonCount = s.garrison.reduce((acc, stack) => acc + stack.count, 0);
           const isBesieged = !!s.siegeCamp || !!s.underSiegeBy;
+          const isSelected = selectedSettlementId === s.id;
 
           return (
             <div
@@ -503,67 +648,93 @@ export const WorldMap2D: React.FC<WorldMap2DProps> = ({
                 left: `${posX}px`,
                 top: `${posY}px`,
               }}
-              onClick={(e) => {
-                e.stopPropagation();
-                sfx.playClick();
-                onSelectSettlement(s.id);
-              }}
-              className="absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer z-20 group hover:z-30 transition-transform active:scale-95"
+              className={`absolute -translate-x-1/2 -translate-y-1/2 select-none ${
+                isSelected ? 'z-40' : 'z-20 hover:z-30'
+              }`}
             >
-              {/* Animated Besieged Aura */}
-              {isBesieged && (
-                <div className="absolute -inset-2 rounded-full border-2 border-red-500 animate-pulse bg-red-950/40" />
+              {/* Selected Castle Golden Halo & Aura */}
+              {isSelected && (
+                <div className="absolute -inset-4 rounded-full border-2 border-amber-400 animate-spin-slow bg-amber-500/20 shadow-[0_0_20px_rgba(251,191,36,0.6)] pointer-events-none" />
               )}
 
-              {/* Settlement Pin & Heraldic Badge */}
-              <div className="flex flex-col items-center">
-                {/* Shield Icon / Castle Marker */}
+              {/* Besieged Smoke / Fire Aura */}
+              {isBesieged && (
+                <div className="absolute -inset-3 rounded-full border-2 border-red-500 animate-pulse bg-red-950/50 shadow-[0_0_15px_rgba(239,68,68,0.7)] pointer-events-none" />
+              )}
+
+              {/* Explicit Touch Target (44x44px for reliable mobile finger taps) */}
+              <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => {
+                  e.stopPropagation();
+                  sfx.playClick();
+                  onSelectSettlement(s.id);
+                  handlePanTo(s.x, s.z);
+                }}
+                className={`relative w-11 h-11 rounded-full flex items-center justify-center transition-transform active:scale-90 focus:outline-none pointer-events-auto ${
+                  isSelected ? 'scale-125' : 'hover:scale-115'
+                }`}
+                title={s.nameKu || s.name}
+              >
+                {/* Shield background badge */}
                 <div
-                  className="relative px-2 py-1 rounded-lg shadow-xl border flex items-center gap-1.5 transition group-hover:scale-110"
+                  className="w-8 h-8 rounded-full border-2 flex items-center justify-center shadow-2xl relative"
                   style={{
-                    backgroundColor: 'rgba(18, 17, 23, 0.92)',
-                    borderColor: isPlayerOwned ? '#d4af37' : 'rgba(212, 175, 55, 0.4)',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
+                    backgroundColor: isSelected ? '#78350f' : 'rgba(20, 18, 24, 0.94)',
+                    borderColor: isSelected ? '#fbbf24' : isPlayerOwned ? '#d4af37' : bannerColor,
+                    boxShadow: isSelected
+                      ? '0 0 14px rgba(251, 191, 36, 0.9)'
+                      : '0 4px 10px rgba(0,0,0,0.8)',
                   }}
                 >
-                  {/* Faction Banner Dot */}
-                  <div
-                    className="w-3.5 h-3.5 rounded-full border border-white/80 shrink-0 flex items-center justify-center shadow"
-                    style={{ backgroundColor: bannerColor }}
-                  >
-                    {isBesieged ? (
-                      <Flame className="w-2.5 h-2.5 text-amber-300 animate-pulse" />
-                    ) : (
-                      <Castle className="w-2.5 h-2.5 text-white" />
-                    )}
-                  </div>
+                  {isBesieged ? (
+                    <Flame className="w-4 h-4 text-amber-400 animate-pulse" />
+                  ) : s.type === 'town' ? (
+                    <Crown className="w-4 h-4" style={{ color: isSelected ? '#fbbf24' : '#f59e0b' }} />
+                  ) : (
+                    <Castle className="w-4 h-4" style={{ color: isSelected ? '#fbbf24' : '#e2e8f0' }} />
+                  )}
 
-                  {/* Settlement Name */}
-                  <span className="font-bold text-[11px] text-stone-100 font-serif leading-none tracking-wide drop-shadow whitespace-nowrap">
+                  {/* Faction color dot */}
+                  <div
+                    className="absolute -top-1 -right-1 w-3 h-3 rounded-full border border-white shadow"
+                    style={{ backgroundColor: bannerColor }}
+                  />
+                </div>
+              </button>
+
+              {/* Castle Label (with pointer-events-none to prevent blocking neighboring castle taps!) */}
+              <div className="flex flex-col items-center pointer-events-none -mt-1">
+                <div
+                  className={`px-2 py-0.5 rounded-md border flex items-center gap-1.5 shadow-lg backdrop-blur-sm whitespace-nowrap transition-all ${
+                    isSelected
+                      ? 'bg-amber-950/95 border-amber-400 text-amber-200 ring-1 ring-amber-400/50 scale-105'
+                      : 'bg-stone-950/90 border-stone-700/80 text-stone-200'
+                  }`}
+                >
+                  <span className="font-bold text-[10.5px] font-serif tracking-wide drop-shadow">
                     {s.nameKu || s.name}
                   </span>
 
-                  {/* Garrison count badge */}
-                  <span className="text-[9px] font-semibold text-amber-300/90 tabular-nums bg-stone-900/90 px-1 rounded border border-amber-500/20">
+                  <span className="text-[9px] font-mono font-semibold text-amber-300 bg-stone-900/90 px-1 rounded border border-amber-500/20">
                     {garrisonCount}
                   </span>
                 </div>
-
-                {/* Subtitle Pin Base */}
-                <div className="w-1.5 h-1.5 rotate-45 bg-amber-500/80 -mt-0.5 border border-stone-950" />
               </div>
             </div>
           );
         })}
 
         {/* =========================================================================
-            4. ANIMATED ARMIES ON THE MAP
+            4. DETAILED ANIMATED MEDIEVAL ARMIES & BANNERS (Phase 4)
            ========================================================================= */}
         {Object.values(gameState.parties).map((p) => {
           const posX = (p.x / 100) * MAP_WIDTH;
           const posY = (p.z / 100) * MAP_HEIGHT;
           const isPlayer = p.type === 'player';
           const troopTotal = p.troops.reduce((acc, st) => acc + st.count, 0);
+          const isMoving = p.targetX !== undefined && p.targetZ !== undefined;
 
           return (
             <div
@@ -572,49 +743,107 @@ export const WorldMap2D: React.FC<WorldMap2DProps> = ({
                 left: `${posX}px`,
                 top: `${posY}px`,
               }}
-              onClick={(e) => {
+              onPointerDown={(e) => e.stopPropagation()}
+              onPointerUp={(e) => {
                 e.stopPropagation();
                 sfx.playClick();
                 if (!isPlayer) {
                   onSelectParty(p.id);
                 }
               }}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 z-25 cursor-pointer transition-transform duration-100 ${
-                isPlayer ? 'z-35 scale-110' : 'hover:scale-115'
+              className={`absolute -translate-x-1/2 -translate-y-1/2 select-none cursor-pointer transition-transform ${
+                isPlayer ? 'z-35 scale-110 active:scale-95' : 'z-25 hover:scale-115 active:scale-95'
               }`}
             >
               {isPlayer ? (
-                /* Player Army Token */
+                /* Player Warband Hero Sprite */
                 <div className="relative flex flex-col items-center">
-                  <div className="relative p-1.5 rounded-xl bg-gradient-to-br from-amber-600 via-amber-900 to-stone-950 border-2 border-amber-300 shadow-2xl flex items-center gap-1 animate-pulse">
-                    <Crown className="w-4 h-4 text-amber-300 drop-shadow" />
-                    <span className="text-[10px] font-bold text-amber-200 tabular-nums">
-                      {troopTotal}
-                    </span>
+                  {/* Commander Plume & Heraldic Banner */}
+                  <div className="relative px-2 py-1 rounded-xl bg-gradient-to-br from-amber-700 via-amber-900 to-stone-950 border-2 border-amber-300 shadow-[0_4px_16px_rgba(217,119,6,0.6)] flex items-center gap-1.5">
+                    {/* Animated Walking Horse / Knight Icon */}
+                    <div className="w-5 h-5 rounded-lg bg-amber-500/30 border border-amber-400/50 flex items-center justify-center">
+                      <Crown className="w-3.5 h-3.5 text-amber-200" />
+                    </div>
+
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-amber-100 font-serif leading-none">
+                        تۆ (فەرماندە)
+                      </span>
+                      <span className="text-[8.5px] font-mono text-amber-300/90 leading-tight">
+                        {troopTotal} جەنگاوەر
+                      </span>
+                    </div>
+
+                    {isMoving && (
+                      <Footprints className="w-3 h-3 text-amber-400 animate-bounce ml-0.5" />
+                    )}
                   </div>
-                  {/* Marching direction arrow */}
-                  {p.targetX !== undefined && (
-                    <div className="w-2 h-2 rotate-45 bg-amber-400 border border-stone-950 -mt-1" />
+
+                  {/* Marching direction pointer */}
+                  {isMoving && (
+                    <div className="w-2 h-2 rotate-45 bg-amber-400 border border-stone-950 -mt-1 shadow" />
                   )}
                 </div>
+              ) : p.type === 'caravan' ? (
+                /* Trade Caravan Token */
+                <div className="relative flex flex-col items-center group">
+                  <div className="px-2 py-0.5 rounded-lg border border-amber-500/60 bg-stone-950/95 shadow-xl flex items-center gap-1.5">
+                    <div className="w-3.5 h-3.5 rounded-full bg-amber-600/40 border border-amber-400 flex items-center justify-center text-[9px]">
+                      🐫
+                    </div>
+                    <span className="text-[9px] font-bold text-amber-300">
+                      کاروان ({troopTotal})
+                    </span>
+                  </div>
+                  <div className="hidden group-hover:flex absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap bg-stone-950/95 border border-amber-500/50 rounded px-2 py-0.5 text-[9px] font-semibold text-amber-300 shadow-xl pointer-events-none">
+                    {p.nameKu || p.name}
+                  </div>
+                </div>
+              ) : p.type === 'bandit' ? (
+                /* Bandit Raider Token */
+                <div className="relative flex flex-col items-center group">
+                  <div className="px-2 py-0.5 rounded-lg border border-red-600/70 bg-stone-950/95 shadow-xl flex items-center gap-1.5">
+                    <div className="w-3.5 h-3.5 rounded-full bg-red-950 border border-red-500 flex items-center justify-center text-[9px]">
+                      🗡️
+                    </div>
+                    <span className="text-[9px] font-bold text-red-300">
+                      ڕێگر ({troopTotal})
+                    </span>
+                  </div>
+                  <div className="hidden group-hover:flex absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap bg-stone-950/95 border border-red-500/50 rounded px-2 py-0.5 text-[9px] font-semibold text-red-300 shadow-xl pointer-events-none">
+                    {p.nameKu || p.name}
+                  </div>
+                </div>
               ) : (
-                /* AI Lord / Caravan / Bandit Token */
+                /* Lord Host / Military Army Token */
                 <div className="relative flex flex-col items-center group">
                   <div
-                    className="px-1.5 py-0.5 rounded-lg border flex items-center gap-1 shadow-lg bg-stone-950/90 transition group-hover:scale-110"
-                    style={{ borderColor: p.bannerColor || '#94a3b8' }}
+                    className="px-2 py-0.5 rounded-lg border shadow-xl flex items-center gap-1.5 bg-stone-950/95 transition-transform"
+                    style={{ borderColor: p.bannerColor || '#38bdf8' }}
                   >
                     <div
-                      className="w-2.5 h-2.5 rounded-full shrink-0 border border-white/60"
-                      style={{ backgroundColor: p.bannerColor || '#94a3b8' }}
-                    />
-                    <span className="text-[9px] font-bold text-stone-200 tabular-nums">
-                      {troopTotal}
-                    </span>
+                      className="w-3.5 h-3.5 rounded-full border border-white/80 shrink-0 shadow flex items-center justify-center"
+                      style={{ backgroundColor: p.bannerColor || '#38bdf8' }}
+                    >
+                      <Swords className="w-2 h-2 text-white" />
+                    </div>
+
+                    <div className="flex flex-col">
+                      <span className="text-[9.5px] font-bold text-stone-200 font-serif leading-none">
+                        {p.nameKu?.split(' ')[0] || p.name.split(' ')[0]}
+                      </span>
+                      <span className="text-[8px] font-mono text-stone-400 leading-tight">
+                        {troopTotal} سەرباز
+                      </span>
+                    </div>
+
+                    {isMoving && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    )}
                   </div>
 
                   {/* Tooltip on hover */}
-                  <div className="hidden group-hover:flex absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap bg-stone-950/95 border border-amber-500/50 rounded px-2 py-0.5 text-[9px] font-semibold text-amber-300 shadow-xl pointer-events-none">
+                  <div className="hidden group-hover:flex absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-stone-950/95 border border-amber-500/50 rounded-lg px-2.5 py-1 text-[9.5px] font-semibold text-amber-300 shadow-2xl pointer-events-none z-50">
                     {p.nameKu || p.name}
                   </div>
                 </div>

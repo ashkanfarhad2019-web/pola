@@ -657,8 +657,35 @@ export class MilitaryEngine implements IEngineModule {
             }
             p.targetX = undefined;
             p.targetZ = undefined;
+          } else {
+            // AI parties (Lords, Caravans, Bandits): Continuously pick new patrol & march coordinates!
+            if (p.type === 'lord') {
+              // Lords patrol between their realm's regional heartlands
+              const wanderAngle = Math.random() * Math.PI * 2;
+              const wanderDist = 12 + Math.random() * 20;
+              p.targetX = Math.max(10, Math.min(90, p.x + Math.cos(wanderAngle) * wanderDist));
+              p.targetZ = Math.max(8, Math.min(88, p.z + Math.sin(wanderAngle) * wanderDist));
+            } else if (p.type === 'bandit') {
+              // Bandits stalk crossroads and mountain routes
+              const wanderAngle = Math.random() * Math.PI * 2;
+              const wanderDist = 8 + Math.random() * 15;
+              p.targetX = Math.max(12, Math.min(88, p.x + Math.cos(wanderAngle) * wanderDist));
+              p.targetZ = Math.max(10, Math.min(85, p.z + Math.sin(wanderAngle) * wanderDist));
+            } else if (p.type === 'caravan') {
+              // Caravans journey across trade hubs
+              const wanderAngle = Math.random() * Math.PI * 2;
+              const wanderDist = 20 + Math.random() * 30;
+              p.targetX = Math.max(10, Math.min(90, p.x + Math.cos(wanderAngle) * wanderDist));
+              p.targetZ = Math.max(10, Math.min(85, p.z + Math.sin(wanderAngle) * wanderDist));
+            }
           }
         }
+      } else if (p.type !== 'player' && (p.targetX === undefined || p.targetZ === undefined)) {
+        // AI party without target: Initialize roam target
+        const wanderAngle = Math.random() * Math.PI * 2;
+        const wanderDist = 15 + Math.random() * 20;
+        p.targetX = Math.max(10, Math.min(90, p.x + Math.cos(wanderAngle) * wanderDist));
+        p.targetZ = Math.max(10, Math.min(85, p.z + Math.sin(wanderAngle) * wanderDist));
       }
 
       nextParties[pId] = p;

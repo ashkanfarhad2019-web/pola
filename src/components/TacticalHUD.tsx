@@ -475,9 +475,9 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
          ========================================================================= */}
       <div className="relative flex-1 flex items-stretch justify-between p-2 sm:p-3 pointer-events-none overflow-hidden">
         {/* =========================================================================
-            B. LEFT VERTICAL NAVIGATION
+            B. LEFT VERTICAL NAVIGATION (Desktop / Tablet landscape)
            ========================================================================= */}
-        <aside className="pointer-events-auto flex flex-col justify-start gap-2 z-30 self-start">
+        <aside className="pointer-events-auto hidden md:flex flex-col justify-start gap-2 z-30 self-start">
           <div className="medieval-panel rounded-2xl p-1.5 flex flex-col gap-1 shadow-2xl border-amber-600/35">
             {/* World Map */}
             <button
@@ -493,7 +493,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
               title={t.tabWorld}
             >
               <Map className="w-4 h-4 shrink-0 text-amber-400" />
-              <span className="hidden sm:inline">{lang === 'ku' ? 'نەخشەی جیهان' : 'World Map'}</span>
+              <span>{lang === 'ku' ? 'نەخشەی جیهان' : 'World Map'}</span>
             </button>
 
             {/* Military / Warband */}
@@ -510,7 +510,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
               title={t.tabMilitary}
             >
               <Swords className="w-4 h-4 shrink-0 text-red-400" />
-              <span className="hidden sm:inline">{lang === 'ku' ? 'سوپا و چەکدار' : 'Military'}</span>
+              <span>{lang === 'ku' ? 'سوپا و چەکدار' : 'Military'}</span>
             </button>
 
             {/* Diplomacy / Politics */}
@@ -527,7 +527,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
               title={t.tabDiplomacy}
             >
               <Scale className="w-4 h-4 shrink-0 text-amber-400" />
-              <span className="hidden sm:inline">{lang === 'ku' ? 'سیاسەت و پەیمان' : 'Diplomacy'}</span>
+              <span>{lang === 'ku' ? 'سیاسەت و پەیمان' : 'Diplomacy'}</span>
             </button>
 
             {/* Economy and Trade */}
@@ -544,7 +544,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
               title={t.tabTrade}
             >
               <Store className="w-4 h-4 shrink-0 text-yellow-400" />
-              <span className="hidden sm:inline">{lang === 'ku' ? 'بازرگانی و سەودا' : 'Economy'}</span>
+              <span>{lang === 'ku' ? 'بازرگانی و سەودا' : 'Economy'}</span>
             </button>
 
             {/* Espionage / Spies */}
@@ -561,7 +561,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
               title="سیخوڕی و زانیاری"
             >
               <Eye className="w-4 h-4 shrink-0 text-emerald-400" />
-              <span className="hidden sm:inline">{lang === 'ku' ? 'سیخوڕی' : 'Espionage'}</span>
+              <span>{lang === 'ku' ? 'سیخوڕی' : 'Espionage'}</span>
             </button>
 
             {/* Chronicle and News */}
@@ -578,28 +578,33 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
               title={t.tabLog}
             >
               <Scroll className="w-4 h-4 shrink-0 text-stone-300" />
-              <span className="hidden sm:inline">{lang === 'ku' ? 'هەواڵ و مێژوو' : 'Chronicle'}</span>
+              <span>{lang === 'ku' ? 'هەواڵ و مێژوو' : 'Chronicle'}</span>
             </button>
           </div>
         </aside>
 
-        {/* Central Map Spacer: Keeps 3D Three.js Map fully interactive */}
+        {/* Central Map Spacer: Keeps 2D/3D Map fully interactive */}
         <div className="flex-1 pointer-events-none" />
 
         {/* =========================================================================
-            D. RIGHT SETTLEMENT INFORMATION PANEL
-            (Shown ONLY when a city or castle is selected on the map!)
+            D. CONTEXTUAL SETTLEMENT INFORMATION PANEL
+            (Desktop: Right Sidebar; Mobile: Sleek Touch Bottom Sheet)
            ========================================================================= */}
         {selectedSettlement && (
-          <aside className="pointer-events-auto w-76 sm:w-84 max-w-[85vw] self-start z-30 animate-slide-left">
+          <aside className="pointer-events-auto fixed md:relative inset-x-2 bottom-16 sm:bottom-20 md:inset-auto md:w-84 max-md:max-h-[72vh] max-md:overflow-y-auto max-md:z-40 md:self-start z-30 animate-fade-in shadow-2xl">
             <div className="medieval-panel rounded-2xl p-3 sm:p-4 shadow-2xl relative border-amber-500/40">
+              {/* Mobile Drag Indicator Handle */}
+              <div className="md:hidden flex justify-center pb-2">
+                <div className="w-12 h-1 rounded-full bg-amber-500/40" />
+              </div>
+
               {/* Close Button */}
               <button
                 onClick={() => {
                   sfx.playClick();
                   onSelectSettlement?.(null);
                 }}
-                className="absolute top-3 right-3 p-1 rounded-lg text-stone-400 hover:text-stone-100 hover:bg-stone-800 transition z-10"
+                className="absolute top-3 right-3 p-1.5 rounded-lg text-stone-400 hover:text-stone-100 hover:bg-stone-800 transition z-10"
                 title="داخستن"
               >
                 <X className="w-4 h-4" />
@@ -808,19 +813,24 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
 
               {/* Proximity Strategic Actions */}
               <div className="pt-1 flex flex-col gap-1.5">
+                {/* Dedicated Castle Visit Button (Always available for deep inspection & courtyard visit) */}
+                <button
+                  onClick={() => {
+                    sfx.playClick();
+                    onEnterSettlement?.(selectedSettlement.id, 'hub');
+                  }}
+                  className="medieval-gold-btn w-full py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 text-xs font-bold shadow-lg"
+                >
+                  <Castle className="w-4 h-4 text-stone-950" />
+                  <span>
+                    {lang === 'ku'
+                      ? `سەردانیکردنی ${isSelectedCity ? 'شار' : 'قەڵا'} (Visit)`
+                      : `Enter ${isSelectedCity ? 'City' : 'Castle'} Courtyard`}
+                  </span>
+                </button>
+
                 {isSelectedSettlementNear ? (
                   <>
-                    <button
-                      onClick={() => {
-                        sfx.playClick();
-                        onEnterSettlement?.(selectedSettlement.id, 'hub');
-                      }}
-                      className="medieval-gold-btn w-full py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs"
-                    >
-                      <Building2 className="w-4 h-4 text-stone-950" />
-                      <span>{isSelectedCity ? t.enterCity : t.enterCastle}</span>
-                    </button>
-
                     {isSelectedEnemy && (
                       <button
                         onClick={() => {
@@ -831,7 +841,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
                             onStartSiegeCamp?.(selectedSettlement.id);
                           }
                         }}
-                        className="medieval-crimson-btn w-full py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs font-bold"
+                        className="medieval-crimson-btn w-full py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs font-bold shadow-lg"
                       >
                         <Swords className="w-4 h-4 text-red-200" />
                         <span>
@@ -858,10 +868,10 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
                         sfx.playClick();
                         onMarchToSettlement?.(selectedSettlement.id);
                       }}
-                      className="medieval-gold-btn w-full py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs"
+                      className="medieval-iron-btn w-full py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs text-amber-300 border-amber-600/40 hover:border-amber-400"
                     >
-                      <Footprints className="w-4 h-4 text-stone-950" />
-                      <span>{lang === 'ku' ? 'بەرەو ئێرە بڕۆ (March)' : 'March Army Here'}</span>
+                      <Footprints className="w-4 h-4 text-amber-400" />
+                      <span>{lang === 'ku' ? 'بەرەو ئێرە بڕۆ (March)' : 'March Warband Here'}</span>
                     </button>
 
                     {isSelectedEnemy && (
@@ -870,7 +880,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
                           sfx.playClick();
                           onMarchToSettlement?.(selectedSettlement.id);
                         }}
-                        className="medieval-crimson-btn w-full py-1.5 px-2 rounded-lg text-[11px] flex items-center justify-center gap-1.5"
+                        className="medieval-crimson-btn w-full py-1.5 px-2 rounded-lg text-[11px] flex items-center justify-center gap-1.5 font-bold"
                       >
                         <Swords className="w-3.5 h-3.5 text-red-200" />
                         <span>{lang === 'ku' ? 'بڕۆ بۆ گەمارۆدان' : 'March to Besiege'}</span>
@@ -891,9 +901,9 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
          ========================================================================= */}
       <footer className="w-full pointer-events-none px-2 sm:px-4 pb-2.5 flex items-end justify-between z-30">
         {/* =========================================================================
-            F. BOTTOM-LEFT MINIMAP (Representing real Three.js map & camera position)
+            F. BOTTOM-LEFT MINIMAP (Representing real map & camera position)
            ========================================================================= */}
-        <div className="pointer-events-auto medieval-panel rounded-2xl p-1.5 shadow-2xl border-amber-600/40 flex flex-col gap-1 w-36 sm:w-44">
+        <div className="pointer-events-auto hidden sm:flex medieval-panel rounded-2xl p-1.5 shadow-2xl border-amber-600/40 flex-col gap-1 w-36 sm:w-44 shrink-0">
           {/* Header & Controls bar */}
           <div className="flex items-center justify-between px-1 text-[10px] text-amber-300/90 font-serif font-bold border-b border-amber-500/20 pb-0.5">
             <span className="flex items-center gap-1">
@@ -961,9 +971,9 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
         </div>
 
         {/* =========================================================================
-            E. BOTTOM NAVIGATION DOCK (Matching IMAGE 1 Structure)
+            E. BOTTOM NAVIGATION DOCK (Touch-Friendly Responsive Nav)
            ========================================================================= */}
-        <nav className="pointer-events-auto medieval-panel rounded-2xl p-1.5 flex items-center gap-1 sm:gap-2 shadow-2xl border-amber-600/40 mx-auto">
+        <nav className="pointer-events-auto medieval-panel rounded-2xl p-1 sm:p-1.5 flex items-center justify-around sm:justify-center gap-1 sm:gap-2 shadow-2xl border-amber-600/40 mx-auto w-full sm:w-auto max-w-md">
           {/* 1. World Map */}
           <button
             onClick={() => {

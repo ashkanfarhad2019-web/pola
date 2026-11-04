@@ -259,6 +259,7 @@ export interface PlayerCharacter {
   dinars: number;
   renown: number;
   honor: number;
+  morale?: number;
   factionId: FactionId | 'independent';
   troops: TroopStack[];
   inventory: Partial<Record<GoodId, number>>;

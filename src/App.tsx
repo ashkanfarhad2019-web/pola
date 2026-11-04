@@ -129,6 +129,9 @@ export default function App() {
     if (!settlement) return;
     sfx.playClick();
     setSelectedSettlementId(settlementId);
+    if (cameraControls?.panTo) {
+      cameraControls.panTo(settlement.x, settlement.z);
+    }
   };
 
   // Direct march to settlement from the inspector panel
@@ -992,6 +995,7 @@ export default function App() {
         <>
           <WorldMap2D
             gameState={gameState}
+            selectedSettlementId={selectedSettlementId}
             onSelectSettlement={handleSelectSettlement}
             onSelectParty={handleSelectParty}
             onSetDestination={handleSetDestination}
