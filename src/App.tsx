@@ -8,7 +8,9 @@ import { createInitialGameState, simulateTick } from './utils/gameSimulation';
 import { loadGameFromStorage, saveGameToStorage } from './utils/saveManager';
 import { Language, TRANSLATIONS } from './localization/translations';
 import { sfx } from './audio/soundFx';
-import { WorldMap3D, MapCameraControls } from './components/WorldMap3D';
+import { WorldMap2D } from './components/WorldMap2D';
+import { MapCameraControls } from './components/WorldMap3D';
+import { findRoadPath } from './utils/mapPathfinding';
 import { TacticalHUD } from './components/TacticalHUD';
 import { CityView } from './components/CityView';
 import { PartyView } from './components/PartyView';
@@ -34,6 +36,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<'map' | 'city' | 'party' | 'diplomacy' | 'news' | 'log' | 'siege_camp'>('map');
   const [currentSettlementId, setCurrentSettlementId] = useState<string | null>(null);
   const [selectedSettlementId, setSelectedSettlementId] = useState<string | null>(null);
+  const [cityInitialSection, setCityInitialSection] = useState<'hub' | 'market' | 'tavern' | 'keep' | 'workshops' | 'siege'>('hub');
   const [activeSiegeSettlementId, setActiveSiegeSettlementId] = useState<string | null>(null);
   const [cameraControls, setCameraControls] = useState<MapCameraControls | null>(null);
 
@@ -95,13 +98,21 @@ export default function App() {
     return () => cancelAnimationFrame(frameId);
   }, [screen]);
 
-  // Handle setting player target coordinates on the map
+  // Handle setting player target coordinates on the map with road network pathfinding
   const handleSetDestination = (x: number, z: number, targetSettlementId?: string, targetPartyId?: string) => {
     setGameState((prev) => {
       const next = { ...prev };
       const playerParty = { ...next.parties['player_party'] };
-      playerParty.targetX = x;
-      playerParty.targetZ = z;
+      if (!playerParty) return next;
+
+      // Find path along visible roads and bridges
+      const roadPath = findRoadPath(playerParty.x, playerParty.z, x, z);
+      const waypoints = roadPath.length > 1 ? roadPath.slice(1) : [{ x, z }];
+
+      playerParty.pathWaypoints = waypoints;
+      playerParty.waypointIndex = 0;
+      playerParty.targetX = waypoints[0].x;
+      playerParty.targetZ = waypoints[0].z;
       playerParty.targetSettlementId = targetSettlementId;
       playerParty.targetPartyId = targetPartyId;
       next.parties = { ...next.parties, player_party: playerParty };
@@ -133,10 +144,14 @@ export default function App() {
     }));
   };
 
-  // Enter settlement directly from inspector
-  const handleEnterSettlement = (settlementId: string) => {
+  // Enter settlement directly from inspector with target section
+  const handleEnterSettlement = (
+    settlementId: string,
+    section: 'hub' | 'market' | 'tavern' | 'keep' | 'workshops' | 'siege' = 'hub'
+  ) => {
     sfx.playCityEnter();
     setCurrentSettlementId(settlementId);
+    setCityInitialSection(section);
     setSelectedSettlementId(null);
     setActiveView('city');
   };
@@ -972,10 +987,10 @@ export default function App() {
         />
       )}
 
-      {/* 3D WORLD MAP VIEW */}
+      {/* 2D ILLUSTRATED REALM WORLD MAP */}
       {screen === 'playing' && (
         <>
-          <WorldMap3D
+          <WorldMap2D
             gameState={gameState}
             onSelectSettlement={handleSelectSettlement}
             onSelectParty={handleSelectParty}
@@ -1015,7 +1030,9 @@ export default function App() {
           {/* CITY / CASTLE VIEW MODAL */}
           {activeView === 'city' && currentSettlementId && gameState.settlements[currentSettlementId] && (
             <CityView
+              key={`${currentSettlementId}_${cityInitialSection}`}
               settlement={gameState.settlements[currentSettlementId]}
+              initialSection={cityInitialSection}
               gameState={gameState}
               lang={lang}
               onClose={() => setActiveView('map')}

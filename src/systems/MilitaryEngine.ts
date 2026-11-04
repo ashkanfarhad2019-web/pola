@@ -602,7 +602,42 @@ export class MilitaryEngine implements IEngineModule {
         return;
       }
 
-      if (p.targetX !== undefined && p.targetZ !== undefined) {
+      if (p.pathWaypoints && p.pathWaypoints.length > 0) {
+        const idx = p.waypointIndex || 0;
+        const currentTarget = p.pathWaypoints[idx];
+        if (currentTarget) {
+          const dx = currentTarget.x - p.x;
+          const dz = currentTarget.z - p.z;
+          const dist = Math.hypot(dx, dz);
+          const isFinal = idx >= p.pathWaypoints.length - 1;
+          const arrivalThreshold = isFinal ? ((p.type === 'player' && p.targetSettlementId) ? 2.5 : 1.2) : 1.6;
+
+          if (dist > arrivalThreshold) {
+            const actualSpeed = this.calculatePartySpeed(p, p.type === 'player');
+            const step = actualSpeed * dtSeconds * 0.75 * speedMult;
+            p.x += (dx / dist) * Math.min(step, dist);
+            p.z += (dz / dist) * Math.min(step, dist);
+          } else {
+            // Reached this waypoint
+            if (!isFinal) {
+              p.waypointIndex = idx + 1;
+            } else {
+              // Final destination reached
+              p.pathWaypoints = undefined;
+              p.waypointIndex = undefined;
+              p.targetX = undefined;
+              p.targetZ = undefined;
+              if (p.type === 'player' && p.targetSettlementId && onPlayerArrival) {
+                onPlayerArrival(p.targetSettlementId);
+                p.targetSettlementId = undefined;
+              }
+            }
+          }
+        } else {
+          p.pathWaypoints = undefined;
+          p.waypointIndex = undefined;
+        }
+      } else if (p.targetX !== undefined && p.targetZ !== undefined) {
         const dx = p.targetX - p.x;
         const dz = p.targetZ - p.z;
         const dist = Math.hypot(dx, dz);

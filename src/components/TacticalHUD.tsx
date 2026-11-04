@@ -1,9 +1,13 @@
 /**
- * Tactical HUD & Unified Navigation Rail
- * Dark iron and antique gold grand strategy interface
- * Inspired by Mount & Blade, Crusader Kings, and Total War
+ * Tactical HUD & Grand Medieval Strategy Interface
+ * Implements:
+ * A. Top Resource & Time Bar (Monarch profile, Dinars, Food, Renown, Soldiers, Date/Time, Speed, Archives)
+ * B. Left Vertical Navigation (World Map, Military, Diplomacy, Economy, Espionage, Chronicle)
+ * C. Right Contextual Settlement Information Panel (Citadel visual, population, food, prosperity, public order, defense, 3 shortcut buttons)
+ * E. Bottom Navigation Dock (World Map, Kingdoms, War, Intelligence, Chronicle)
+ * F. Bottom-Left Interactive Real-Time Minimap (Terrain, Settlements, Parties, Camera Viewport, Pan interaction)
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FactionId, GameState, Settlement } from '../types/game';
 import { TRANSLATIONS, Language } from '../localization/translations';
 import { sfx } from '../audio/soundFx';
@@ -20,8 +24,6 @@ import {
   Scale,
   Scroll,
   Save,
-  ChevronDown,
-  ChevronUp,
   Compass,
   Eye,
   Crown,
@@ -37,7 +39,12 @@ import {
   Store,
   Beer,
   Footprints,
-  Flame
+  Flame,
+  Trophy,
+  Landmark,
+  ShieldAlert,
+  ChevronRight,
+  Maximize2
 } from 'lucide-react';
 
 interface TacticalHUDProps {
@@ -48,7 +55,10 @@ interface TacticalHUDProps {
   selectedSettlementId?: string | null;
   cameraControls?: MapCameraControls | null;
   onSelectSettlement?: (settlementId: string | null) => void;
-  onEnterSettlement?: (settlementId: string) => void;
+  onEnterSettlement?: (
+    settlementId: string,
+    section?: 'hub' | 'market' | 'tavern' | 'keep' | 'workshops' | 'siege'
+  ) => void;
   onMarchToSettlement?: (settlementId: string) => void;
   onOpenView: (view: 'map' | 'city' | 'party' | 'diplomacy' | 'news' | 'log' | 'siege_camp') => void;
   onOpenSaveModal: () => void;
@@ -76,6 +86,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
   onInitiateSiege,
 }) => {
   const t = TRANSLATIONS[lang];
+  const minimapCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const player = gameState.player;
   const playerParty = gameState.parties['player_party'];
@@ -120,28 +131,152 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
   const selectedFaction = selectedSettlement ? gameState.factions[selectedSettlement.factionId] : null;
   const selectedLord = selectedSettlement?.lordOwnerId ? gameState.lords[selectedSettlement.lordOwnerId] : null;
 
+  // =========================================================================
+  // F. BOTTOM-LEFT MINIMAP (Real-time dynamic canvas rendering)
+  // =========================================================================
+  useEffect(() => {
+    const canvas = minimapCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Coordinate mapping: 0 to 100% of illustrated map
+    const toMapX = (worldX: number) => (worldX / 100) * width;
+    const toMapY = (worldZ: number) => (worldZ / 100) * height;
+
+    // 1. Clear background parchment tone
+    ctx.fillStyle = '#1c160f';
+    ctx.fillRect(0, 0, width, height);
+
+    // 2. Map border trim
+    ctx.fillStyle = '#261f16';
+    ctx.fillRect(1, 1, width - 2, height - 2);
+
+    // 4. Draw Settlements
+    Object.values(gameState.settlements).forEach((s) => {
+      const sx = toMapX(s.x);
+      const sy = toMapY(s.z);
+      const f = gameState.factions[s.factionId];
+      const color = f?.color || '#94a3b8';
+
+      // Ring
+      ctx.beginPath();
+      ctx.arc(sx, sy, s.type === 'town' ? 3.5 : 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = '#1a191e';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+
+      // Selected settlement reticle
+      if (selectedSettlementId === s.id) {
+        ctx.beginPath();
+        ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+        ctx.strokeStyle = '#d4af37';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    });
+
+    // 5. Draw Roaming Parties
+    Object.values(gameState.parties).forEach((p) => {
+      if (p.id === 'player_party') return;
+      const px = toMapX(p.x);
+      const py = toMapY(p.z);
+      ctx.beginPath();
+      ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = p.type === 'bandit' ? '#ef4444' : p.type === 'caravan' ? '#f59e0b' : '#38bdf8';
+      ctx.fill();
+    });
+
+    // 6. Draw Player Party
+    if (playerParty) {
+      const px = toMapX(playerParty.x);
+      const py = toMapY(playerParty.z);
+
+      // Pulse glow
+      ctx.beginPath();
+      ctx.arc(px, py, 5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(212, 175, 55, 0.4)';
+      ctx.fill();
+
+      // Core player dot
+      ctx.beginPath();
+      ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#fbbf24';
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Destination line if marching
+      if (playerParty.targetX !== undefined && playerParty.targetZ !== undefined) {
+        ctx.setLineDash([2, 2]);
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.6)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(toMapX(playerParty.targetX), toMapY(playerParty.targetZ));
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // 7. Camera Viewport Zone
+    const camPos = cameraControls?.getCameraTarget ? cameraControls.getCameraTarget() : playerParty;
+    if (camPos) {
+      const cx = toMapX(camPos.x);
+      const cy = toMapY(camPos.z);
+      const viewW = 28;
+      const viewH = 20;
+      ctx.strokeStyle = 'rgba(212, 175, 55, 0.55)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx - viewW / 2, cy - viewH / 2, viewW, viewH);
+    }
+  }, [gameState, selectedSettlementId, cameraControls, playerParty]);
+
+  // Handle Minimap Click / Drag to Pan
+  const handleMinimapClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = minimapCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    const worldX = (clickX / canvas.width) * 100;
+    const worldZ = (clickY / canvas.height) * 100;
+
+    sfx.playClick();
+    if (cameraControls?.panTo) {
+      cameraControls.panTo(worldX, worldZ);
+    }
+  };
+
   return (
-    <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between overflow-hidden">
+    <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between overflow-hidden select-none">
       {/* =========================================================================
-          1. TOP RESOURCE & TIME BAR (Compact Cast-Iron & Antique Gold)
+          A. TOP RESOURCE BAR (Full-width medieval iron and antique gold frame)
          ========================================================================= */}
-      <header className="w-full pointer-events-auto bg-gradient-to-b from-[#0e0d12]/95 via-[#15141b]/90 to-transparent border-b border-amber-600/25 px-2.5 sm:px-5 py-2 flex items-center justify-between shadow-2xl backdrop-blur-[2px]">
-        {/* Left: Monarch Dynasty Crest & Title */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="relative flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-br from-amber-600/40 via-amber-900/60 to-stone-950 border border-amber-400/60 shadow-lg shadow-amber-950/40">
+      <header className="w-full pointer-events-auto medieval-panel border-b border-amber-600/35 px-2.5 sm:px-5 py-2 flex items-center justify-between shadow-2xl backdrop-blur-sm">
+        {/* Left: Game Logo & Kingdom Identity */}
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="relative flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-amber-700/50 via-stone-900 to-stone-950 border border-amber-400/60 shadow-lg shadow-amber-950/60">
             <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300 drop-shadow" />
-            <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-stone-900 border border-amber-400/50 flex items-center justify-center text-[8px] font-bold text-amber-300">
-              ⚔
+            <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-stone-900 border border-amber-400/60 flex items-center justify-center text-[8px] font-bold text-amber-300">
+              ⚜
             </div>
           </div>
 
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-1.5 truncate">
-              <span className="font-bold text-xs sm:text-sm text-stone-100 font-serif tracking-wide truncate">
-                {player.name}
+              <span className="font-bold text-xs sm:text-sm text-stone-100 font-serif tracking-wider truncate">
+                {lang === 'ku' ? 'پۆڵا و دەسەڵات' : 'Steel & Crown'}
               </span>
-              <span className="text-[10px] sm:text-xs text-amber-400 font-semibold px-1.5 py-0.2 rounded bg-amber-950/70 border border-amber-500/30">
-                {player.title}
+              <span className="text-[10px] sm:text-xs text-amber-400 font-semibold px-1.5 py-0.2 rounded bg-amber-950/80 border border-amber-500/40">
+                {player.name} • {player.title}
               </span>
             </div>
             <div className="text-[10px] sm:text-[11px] text-stone-400 truncate flex items-center gap-1">
@@ -155,7 +290,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
           </div>
         </div>
 
-        {/* Center: Logistics & Strategic Resources Cluster */}
+        {/* Center: Gold, Food, Renown, Soldiers, Date & Time */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 max-w-full overflow-x-auto py-0.5">
           {/* Gold Dinars */}
           <div
@@ -175,7 +310,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
             </div>
           </div>
 
-          {/* Warband Troops */}
+          {/* Soldiers / Warband */}
           <div
             className="medieval-panel-subtle rounded-lg px-2.5 py-1 flex items-center gap-1.5 shadow"
             title={`${t.troops} (${totalTroops}/${maxTroops})`}
@@ -187,10 +322,10 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
             </span>
           </div>
 
-          {/* Granary Supplies */}
+          {/* Food Reserves */}
           <div
             className={`medieval-panel-subtle rounded-lg px-2.5 py-1 flex items-center gap-1.5 shadow ${
-              daysFoodLeft < 3 ? 'border-red-500/60 bg-red-950/40 text-red-300' : ''
+              daysFoodLeft < 3 ? 'border-red-500/60 bg-red-950/50 text-red-300' : ''
             }`}
             title={`${t.food}: ${totalFoodItems} (${daysFoodLeft} ${t.foodDays})`}
           >
@@ -219,11 +354,8 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
               {player.renown}
             </span>
           </div>
-        </div>
 
-        {/* Right: Astronomical Clock, Simulation Controls & Archive */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Date & Hour Astronomical Capsule */}
+          {/* Date & Astronomical Hour */}
           <div className="medieval-panel-subtle rounded-lg px-2 sm:px-2.5 py-1 flex items-center gap-1.5 text-xs text-amber-200/90 shadow">
             {isDaytime ? (
               <Sun className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -237,8 +369,11 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
               • {currentHour}:00
             </span>
           </div>
+        </div>
 
-          {/* Segmented Time Speed Controls */}
+        {/* Right: Simulation Speed & Settings Controls */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Speed Controls Segment */}
           <div className="medieval-panel rounded-lg p-0.5 flex items-center gap-0.5 shadow-md">
             {/* Pause */}
             <button
@@ -303,7 +438,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
             </button>
           </div>
 
-          {/* Active Siege Camp Quick Badge */}
+          {/* Active Siege Camp Badge */}
           {gameState.player.isBesiegingSettlementId && (
             <button
               onClick={() => {
@@ -318,7 +453,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
             </button>
           )}
 
-          {/* Royal Archives / Save & Settings */}
+          {/* Settings / Royal Archives */}
           <button
             onClick={() => {
               sfx.playClick();
@@ -333,307 +468,352 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
       </header>
 
       {/* =========================================================================
-          2. MAIN VIEWPORT: UNIFIED NAVIGATION RAIL & CONTEXTUAL SETTLEMENT DRAWER
+          MAIN VIEWPORT ROW:
+          - B. Left Vertical Navigation
+          - C. Central 3D World Map (Dominant Focus)
+          - D. Right Contextual Settlement Information Panel
          ========================================================================= */}
-      <div className="relative flex-1 flex items-stretch justify-between p-2 sm:p-4 pointer-events-none">
-        {/* Unified Navigation Rail (Left side on landscape/desktop) */}
-        <aside className="pointer-events-auto flex flex-col justify-between self-center sm:self-start gap-2 z-30">
-          <div className="medieval-panel rounded-xl p-1 sm:p-1.5 flex flex-col gap-1 shadow-2xl">
+      <div className="relative flex-1 flex items-stretch justify-between p-2 sm:p-3 pointer-events-none overflow-hidden">
+        {/* =========================================================================
+            B. LEFT VERTICAL NAVIGATION
+           ========================================================================= */}
+        <aside className="pointer-events-auto flex flex-col justify-start gap-2 z-30 self-start">
+          <div className="medieval-panel rounded-2xl p-1.5 flex flex-col gap-1 shadow-2xl border-amber-600/35">
             {/* World Map */}
             <button
               onClick={() => {
                 sfx.playClick();
                 onOpenView('map');
               }}
-              className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-bold transition ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition ${
                 activeView === 'map'
                   ? 'medieval-gold-btn'
                   : 'text-stone-300 hover:bg-stone-800/80 hover:text-amber-300'
               }`}
               title={t.tabWorld}
             >
-              <Map className="w-4 h-4 shrink-0 text-amber-400 group-hover:scale-110 transition-transform" />
-              <span className="hidden sm:inline">{t.tabWorld}</span>
+              <Map className="w-4 h-4 shrink-0 text-amber-400" />
+              <span className="hidden sm:inline">{lang === 'ku' ? 'نەخشەی جیهان' : 'World Map'}</span>
             </button>
 
-            {/* Current Settlement / Castle (Active when player is inside or near) */}
-            {currentSettlementId && (
-              <button
-                onClick={() => {
-                  sfx.playClick();
-                  onOpenView('city');
-                }}
-                className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-bold transition ${
-                  activeView === 'city'
-                    ? 'medieval-gold-btn'
-                    : 'text-stone-300 hover:bg-stone-800/80 hover:text-amber-300 border border-amber-500/40'
-                }`}
-                title={t.tabSettlement}
-              >
-                <Building2 className="w-4 h-4 shrink-0 text-amber-300 group-hover:scale-110 transition-transform" />
-                <span className="hidden sm:inline">{t.tabSettlement}</span>
-              </button>
-            )}
-
-            {/* Army & Troops */}
+            {/* Military / Warband */}
             <button
               onClick={() => {
                 sfx.playClick();
                 onOpenView('party');
               }}
-              className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-bold transition ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition ${
                 activeView === 'party'
                   ? 'medieval-gold-btn'
                   : 'text-stone-300 hover:bg-stone-800/80 hover:text-amber-300'
               }`}
               title={t.tabMilitary}
             >
-              <Users className="w-4 h-4 shrink-0 text-indigo-300 group-hover:scale-110 transition-transform" />
-              <span className="hidden sm:inline">{t.tabMilitary}</span>
+              <Swords className="w-4 h-4 shrink-0 text-red-400" />
+              <span className="hidden sm:inline">{lang === 'ku' ? 'سوپا و چەکدار' : 'Military'}</span>
             </button>
 
-            {/* Sovereign Diplomacy */}
+            {/* Diplomacy / Politics */}
             <button
               onClick={() => {
                 sfx.playClick();
                 onOpenView('diplomacy');
               }}
-              className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-bold transition ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition ${
                 activeView === 'diplomacy'
                   ? 'medieval-gold-btn'
                   : 'text-stone-300 hover:bg-stone-800/80 hover:text-amber-300'
               }`}
               title={t.tabDiplomacy}
             >
-              <Scale className="w-4 h-4 shrink-0 text-amber-400 group-hover:scale-110 transition-transform" />
-              <span className="hidden sm:inline">{t.tabDiplomacy}</span>
+              <Scale className="w-4 h-4 shrink-0 text-amber-400" />
+              <span className="hidden sm:inline">{lang === 'ku' ? 'سیاسەت و پەیمان' : 'Diplomacy'}</span>
             </button>
 
-            {/* News & Intelligence */}
+            {/* Economy and Trade */}
+            <button
+              onClick={() => {
+                sfx.playClick();
+                if (currentSettlementId) {
+                  onEnterSettlement?.(currentSettlementId, 'market');
+                } else {
+                  onOpenView('party');
+                }
+              }}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-stone-300 hover:bg-stone-800/80 hover:text-amber-300 transition"
+              title={t.tabTrade}
+            >
+              <Store className="w-4 h-4 shrink-0 text-yellow-400" />
+              <span className="hidden sm:inline">{lang === 'ku' ? 'بازرگانی و سەودا' : 'Economy'}</span>
+            </button>
+
+            {/* Espionage / Spies */}
             <button
               onClick={() => {
                 sfx.playClick();
                 onOpenView('news');
               }}
-              className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-bold transition ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition ${
                 activeView === 'news'
                   ? 'medieval-gold-btn'
                   : 'text-stone-300 hover:bg-stone-800/80 hover:text-amber-300'
               }`}
-              title="هەواڵ و سیخوڕی (Intelligence)"
+              title="سیخوڕی و زانیاری"
             >
-              <Eye className="w-4 h-4 shrink-0 text-emerald-400 group-hover:scale-110 transition-transform" />
-              <span className="hidden sm:inline">{lang === 'ku' ? 'سیخوڕی' : 'Spies'}</span>
+              <Eye className="w-4 h-4 shrink-0 text-emerald-400" />
+              <span className="hidden sm:inline">{lang === 'ku' ? 'سیخوڕی' : 'Espionage'}</span>
             </button>
 
-            {/* World Event Annals */}
+            {/* Chronicle and News */}
             <button
               onClick={() => {
                 sfx.playClick();
                 onOpenView('log');
               }}
-              className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-bold transition ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition ${
                 activeView === 'log'
                   ? 'medieval-gold-btn'
                   : 'text-stone-300 hover:bg-stone-800/80 hover:text-amber-300'
               }`}
               title={t.tabLog}
             >
-              <Scroll className="w-4 h-4 shrink-0 text-stone-300 group-hover:scale-110 transition-transform" />
-              <span className="hidden sm:inline">{t.tabLog}</span>
+              <Scroll className="w-4 h-4 shrink-0 text-stone-300" />
+              <span className="hidden sm:inline">{lang === 'ku' ? 'هەواڵ و مێژوو' : 'Chronicle'}</span>
             </button>
-
-            {/* Divider */}
-            <div className="h-px bg-amber-500/20 my-1" />
-
-            {/* Integrated Map Viewport Controls (No duplicates anywhere) */}
-            {cameraControls && (
-              <div className="flex flex-col gap-1">
-                {/* Center Camera on Monarch */}
-                <button
-                  onClick={() => {
-                    sfx.playClick();
-                    cameraControls.focusPlayer();
-                  }}
-                  className={`group flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition ${
-                    cameraControls.isFollowing
-                      ? 'bg-emerald-950/80 border border-emerald-500/50 text-emerald-300'
-                      : 'text-stone-400 hover:bg-stone-800/70 hover:text-stone-200'
-                  }`}
-                  title={lang === 'ku' ? 'سەر کارەکتەر' : 'Center on Hero'}
-                >
-                  <Crosshair className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
-                  <span className="hidden sm:inline">
-                    {lang === 'ku' ? 'کارەکتەر' : 'Hero'}
-                  </span>
-                </button>
-
-                {/* Full Realm Strategic Overview */}
-                <button
-                  onClick={() => {
-                    sfx.playClick();
-                    cameraControls.fullOverview();
-                  }}
-                  className="group flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-stone-400 hover:bg-stone-800/70 hover:text-stone-200 transition"
-                  title={lang === 'ku' ? 'تەواوی نەخشە' : 'Realm Overview'}
-                >
-                  <Map className="w-3.5 h-3.5 shrink-0 text-amber-400/80" />
-                  <span className="hidden sm:inline">
-                    {lang === 'ku' ? 'تەواوی ماپ' : 'Realm'}
-                  </span>
-                </button>
-
-                {/* Zoom In & Zoom Out Row */}
-                <div className="flex items-center gap-1 justify-center pt-0.5">
-                  <button
-                    onClick={() => {
-                      sfx.playClick();
-                      cameraControls.zoomIn();
-                    }}
-                    className="p-1 rounded bg-stone-900/90 hover:bg-stone-800 text-stone-300 hover:text-amber-300 border border-stone-800 transition"
-                    title="Zoom In"
-                  >
-                    <ZoomIn className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      sfx.playClick();
-                      cameraControls.zoomOut();
-                    }}
-                    className="p-1 rounded bg-stone-900/90 hover:bg-stone-800 text-stone-300 hover:text-amber-300 border border-stone-800 transition"
-                    title="Zoom Out"
-                  >
-                    <ZoomOut className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </aside>
 
-        {/* Center Canvas Area: Keep completely open for 3D Green Map focus */}
+        {/* Central Map Spacer: Keeps 3D Three.js Map fully interactive */}
         <div className="flex-1 pointer-events-none" />
 
         {/* =========================================================================
-            3. CONTEXTUAL SETTLEMENT INFORMATION PANEL (Right Side Drawer)
-            Shown ONLY when a settlement is selected on the map!
+            D. RIGHT SETTLEMENT INFORMATION PANEL
+            (Shown ONLY when a city or castle is selected on the map!)
            ========================================================================= */}
         {selectedSettlement && (
-          <aside className="pointer-events-auto w-72 sm:w-80 max-w-[85vw] self-start z-30 animate-slide-left">
+          <aside className="pointer-events-auto w-76 sm:w-84 max-w-[85vw] self-start z-30 animate-slide-left">
             <div className="medieval-panel rounded-2xl p-3 sm:p-4 shadow-2xl relative border-amber-500/40">
-              {/* Header: Heraldry Banner & Close button */}
-              <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-amber-500/25">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-600/30 via-stone-900 to-stone-950 border border-amber-400/50 flex items-center justify-center text-amber-300 shadow">
-                    {isSelectedCity ? (
-                      <Castle className="w-5 h-5 text-amber-300" />
-                    ) : (
-                      <Shield className="w-5 h-5 text-stone-300" />
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm sm:text-base text-stone-100 font-serif leading-tight">
-                      {lang === 'ku' ? selectedSettlement.nameKu : selectedSettlement.name}
-                    </h3>
-                    <div className="text-[11px] text-amber-400/90 flex items-center gap-1">
-                      <span>
-                        {isSelectedCity
-                          ? lang === 'ku'
-                            ? 'شارێکی گەورە'
-                            : 'Major City'
-                          : lang === 'ku'
-                          ? 'قەڵایەکی بەهێز'
-                          : 'Fortified Castle'}
-                      </span>
-                      <span>•</span>
-                      <span className="text-stone-400">
-                        {lang === 'ku' ? selectedFaction?.nameKu : selectedFaction?.name}
-                      </span>
-                    </div>
-                  </div>
+              {/* Close Button */}
+              <button
+                onClick={() => {
+                  sfx.playClick();
+                  onSelectSettlement?.(null);
+                }}
+                className="absolute top-3 right-3 p-1 rounded-lg text-stone-400 hover:text-stone-100 hover:bg-stone-800 transition z-10"
+                title="داخستن"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              {/* Settlement Visual Artwork Banner */}
+              <div className="relative w-full h-24 sm:h-28 rounded-xl overflow-hidden mb-2.5 border border-amber-600/30 bg-gradient-to-b from-[#1c1c24] to-[#0d0d12] flex items-center justify-center">
+                {/* Stylized Medieval Citadel SVG Art */}
+                <svg className="w-full h-full object-cover opacity-80" viewBox="0 0 200 100" preserveAspectRatio="none">
+                  {/* Sky gradient background */}
+                  <defs>
+                    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor="#2c2738" />
+                      <stop offset="100%" stopColor="#141318" />
+                    </linearGradient>
+                    <linearGradient id="wallGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor="#45424e" />
+                      <stop offset="100%" stopColor="#232128" />
+                    </linearGradient>
+                  </defs>
+                  <rect width="200" height="100" fill="url(#skyGrad)" />
+                  {/* Distant mountains */}
+                  <polygon points="0,70 35,40 70,70 110,35 150,70 185,45 200,60 200,100 0,100" fill="#1e1c26" />
+                  {/* Castle Fortress Silhouette */}
+                  <rect x="25" y="45" width="22" height="55" fill="url(#wallGrad)" />
+                  <rect x="153" y="45" width="22" height="55" fill="url(#wallGrad)" />
+                  <rect x="47" y="55" width="106" height="45" fill="url(#wallGrad)" />
+                  {/* Battlements / Crenellations */}
+                  <rect x="23" y="40" width="6" height="6" fill="#524e5d" />
+                  <rect x="33" y="40" width="6" height="6" fill="#524e5d" />
+                  <rect x="43" y="40" width="6" height="6" fill="#524e5d" />
+                  <rect x="151" y="40" width="6" height="6" fill="#524e5d" />
+                  <rect x="161" y="40" width="6" height="6" fill="#524e5d" />
+                  <rect x="171" y="40" width="6" height="6" fill="#524e5d" />
+                  {/* Center Keep & Spire */}
+                  <polygon points="100,20 85,55 115,55" fill="#524e5d" />
+                  <rect x="90" y="55" width="20" height="45" fill="#32303a" />
+                  {/* Citadel Gate */}
+                  <path d="M 94,100 L 94,80 A 6,6 0 0 1 106,80 L 106,100 Z" fill="#121116" />
+                  {/* Heraldic Flying Pennant */}
+                  <polygon
+                    points="100,20 100,28 118,24"
+                    fill={selectedFaction?.color || '#d4af37'}
+                  />
+                </svg>
+
+                {/* Overlay Badge with Faction Emblem */}
+                <div className="absolute bottom-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-stone-950/85 border border-amber-500/40">
+                  <div
+                    className="w-3 h-3 rounded-full border border-white/60"
+                    style={{ backgroundColor: selectedFaction?.color || '#d4af37' }}
+                  />
+                  <span className="text-[10px] font-bold text-amber-200">
+                    {lang === 'ku' ? selectedFaction?.nameKu : selectedFaction?.name}
+                  </span>
                 </div>
-
-                {/* Close Inspector */}
-                <button
-                  onClick={() => {
-                    sfx.playClick();
-                    onSelectSettlement?.(null);
-                  }}
-                  className="p-1 rounded-lg text-stone-400 hover:text-stone-100 hover:bg-stone-800 transition"
-                  title="داخستن"
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
 
-              {/* Lord In Residence */}
-              <div className="py-2 text-[11px] text-stone-300 flex items-center justify-between border-b border-stone-800/80">
-                <span className="text-stone-400">{lang === 'ku' ? 'سەرداری شار:' : 'Ruler:'}</span>
-                <span className="font-semibold text-amber-300">
-                  {selectedLord
-                    ? (lang === 'ku' ? selectedLord.nameKu : selectedLord.name)
-                    : (lang === 'ku' ? 'فەرمانڕەوای نییە' : 'None')}
-                </span>
+              {/* Settlement Name & Ruler */}
+              <div className="pb-2 border-b border-amber-500/25">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-base text-stone-100 font-serif leading-tight">
+                    {lang === 'ku' ? selectedSettlement.nameKu : selectedSettlement.name}
+                  </h3>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-950/70 text-amber-300 border border-amber-500/30">
+                    {isSelectedCity
+                      ? lang === 'ku'
+                        ? 'شار'
+                        : 'City'
+                      : lang === 'ku'
+                      ? 'قەڵا'
+                      : 'Castle'}
+                  </span>
+                </div>
+                <div className="text-[11px] text-stone-300 mt-1 flex items-center justify-between">
+                  <span className="text-stone-400">{lang === 'ku' ? 'فەرمانڕەوا:' : 'Ruler:'}</span>
+                  <span className="font-semibold text-amber-300">
+                    {selectedLord
+                      ? lang === 'ku'
+                        ? selectedLord.nameKu
+                        : selectedLord.name
+                      : lang === 'ku'
+                      ? 'فەرمانڕەوای نییە'
+                      : 'None'}
+                  </span>
+                </div>
               </div>
 
-              {/* Core Strategic Stats Grid */}
-              <div className="grid grid-cols-2 gap-2 my-2.5 text-xs">
-                {/* Garrison */}
-                <div className="medieval-panel-subtle rounded-lg p-2 flex flex-col">
+              {/* Required Settlement Metrics (Actual game state) */}
+              <div className="grid grid-cols-2 gap-1.5 my-2.5 text-xs">
+                {/* Population */}
+                <div className="medieval-panel-subtle rounded-lg p-1.5 flex flex-col">
                   <span className="text-[10px] text-stone-400 flex items-center gap-1">
-                    <Shield className="w-3 h-3 text-indigo-400" />
-                    {t.garrisonStrength}
+                    <Users className="w-3 h-3 text-sky-400" />
+                    {lang === 'ku' ? 'دانیشتووان' : 'Population'}
                   </span>
                   <span className="font-bold text-stone-100 tabular-nums mt-0.5">
-                    {selectedSettlement.garrison.reduce((a, b) => a + b.count, 0)}{' '}
-                    <span className="text-[10px] font-normal text-stone-400">{t.troops}</span>
+                    {selectedSettlement.population.toLocaleString()}
+                  </span>
+                </div>
+
+                {/* Food Reserves */}
+                <div className="medieval-panel-subtle rounded-lg p-1.5 flex flex-col">
+                  <span className="text-[10px] text-stone-400 flex items-center gap-1">
+                    <Wheat className="w-3 h-3 text-amber-400" />
+                    {lang === 'ku' ? 'خۆراکی کۆگا' : 'Food Stock'}
+                  </span>
+                  <span className="font-bold text-stone-100 tabular-nums mt-0.5">
+                    {selectedSettlement.foodReservesDays}{' '}
+                    <span className="text-[10px] font-normal text-stone-400">{t.day}</span>
                   </span>
                 </div>
 
                 {/* Prosperity */}
-                <div className="medieval-panel-subtle rounded-lg p-2 flex flex-col">
+                <div className="medieval-panel-subtle rounded-lg p-1.5 flex flex-col">
                   <span className="text-[10px] text-stone-400 flex items-center gap-1">
                     <Crown className="w-3 h-3 text-amber-400" />
-                    {t.prosperity}
+                    {lang === 'ku' ? 'ئاوەدانی' : 'Prosperity'}
                   </span>
                   <span className="font-bold text-amber-300 tabular-nums mt-0.5">
                     {selectedSettlement.prosperity}%
                   </span>
                 </div>
 
-                {/* Fortifications */}
-                <div className="medieval-panel-subtle rounded-lg p-2 flex flex-col">
+                {/* Public Order */}
+                <div className="medieval-panel-subtle rounded-lg p-1.5 flex flex-col">
                   <span className="text-[10px] text-stone-400 flex items-center gap-1">
-                    <Castle className="w-3 h-3 text-stone-300" />
-                    {t.defenseLevel}
+                    <Scale className="w-3 h-3 text-emerald-400" />
+                    {lang === 'ku' ? 'ڕەزامەندی خەڵک' : 'Public Order'}
+                  </span>
+                  <span className="font-bold text-emerald-300 tabular-nums mt-0.5">
+                    {selectedSettlement.publicOrder}%
+                  </span>
+                </div>
+
+                {/* Defense Level */}
+                <div className="medieval-panel-subtle rounded-lg p-1.5 flex flex-col">
+                  <span className="text-[10px] text-stone-400 flex items-center gap-1">
+                    <Shield className="w-3 h-3 text-stone-300" />
+                    {lang === 'ku' ? 'قایمی شوورا' : 'Defense Level'}
                   </span>
                   <span className="font-bold text-stone-200 tabular-nums mt-0.5">
                     {selectedSettlement.defenseLevel || 1} / 5
                   </span>
                 </div>
 
-                {/* Food reserves */}
-                <div className="medieval-panel-subtle rounded-lg p-2 flex flex-col">
+                {/* Garrison */}
+                <div className="medieval-panel-subtle rounded-lg p-1.5 flex flex-col">
                   <span className="text-[10px] text-stone-400 flex items-center gap-1">
-                    <Wheat className="w-3 h-3 text-amber-400" />
-                    {t.food}
+                    <Swords className="w-3 h-3 text-red-400" />
+                    {lang === 'ku' ? 'پاسەوانان' : 'Garrison'}
                   </span>
-                  <span className="font-bold text-stone-200 tabular-nums mt-0.5">
-                    {selectedSettlement.foodReservesDays || 30}{' '}
-                    <span className="text-[10px] font-normal text-stone-400">{t.day}</span>
+                  <span className="font-bold text-stone-100 tabular-nums mt-0.5">
+                    {selectedSettlement.garrison.reduce((a, b) => a + b.count, 0)} {t.troops}
                   </span>
                 </div>
               </div>
 
-              {/* Strategic Actions based on distance */}
+              {/* Three Mandatory Shortcut Buttons */}
+              <div className="grid grid-cols-3 gap-1.5 my-2">
+                {/* City Management Button */}
+                <button
+                  onClick={() => {
+                    sfx.playClick();
+                    onEnterSettlement?.(selectedSettlement.id, 'keep');
+                  }}
+                  className="medieval-iron-btn py-1.5 px-1 rounded-lg text-[10px] sm:text-[11px] font-bold flex flex-col items-center justify-center gap-1"
+                  title="بەڕێوەبردنی شار"
+                >
+                  <Castle className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="truncate w-full text-center">
+                    {lang === 'ku' ? 'بەڕێوەبردن' : 'Manage'}
+                  </span>
+                </button>
+
+                {/* Market Button */}
+                <button
+                  onClick={() => {
+                    sfx.playClick();
+                    onEnterSettlement?.(selectedSettlement.id, 'market');
+                  }}
+                  className="medieval-iron-btn py-1.5 px-1 rounded-lg text-[10px] sm:text-[11px] font-bold flex flex-col items-center justify-center gap-1"
+                  title="بازاڕی کەلوپەل"
+                >
+                  <Store className="w-3.5 h-3.5 text-amber-300" />
+                  <span className="truncate w-full text-center">
+                    {lang === 'ku' ? 'بازاڕ' : 'Market'}
+                  </span>
+                </button>
+
+                {/* Garrison Button */}
+                <button
+                  onClick={() => {
+                    sfx.playClick();
+                    onEnterSettlement?.(selectedSettlement.id, 'keep');
+                  }}
+                  className="medieval-iron-btn py-1.5 px-1 rounded-lg text-[10px] sm:text-[11px] font-bold flex flex-col items-center justify-center gap-1"
+                  title="پاسەوانانی قەڵا"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5 text-indigo-300" />
+                  <span className="truncate w-full text-center">
+                    {lang === 'ku' ? 'پاسەوان' : 'Garrison'}
+                  </span>
+                </button>
+              </div>
+
+              {/* Proximity Strategic Actions */}
               <div className="pt-1 flex flex-col gap-1.5">
                 {isSelectedSettlementNear ? (
                   <>
-                    {/* Enter Settlement (Primary Gold Action) */}
                     <button
                       onClick={() => {
                         sfx.playClick();
-                        onEnterSettlement?.(selectedSettlement.id);
+                        onEnterSettlement?.(selectedSettlement.id, 'hub');
                       }}
                       className="medieval-gold-btn w-full py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs"
                     >
@@ -641,32 +821,6 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
                       <span>{isSelectedCity ? t.enterCity : t.enterCastle}</span>
                     </button>
 
-                    {/* Secondary Quick Access Bar */}
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <button
-                        onClick={() => {
-                          sfx.playClick();
-                          onEnterSettlement?.(selectedSettlement.id);
-                        }}
-                        className="medieval-iron-btn py-1.5 px-2 rounded-lg text-[11px] flex items-center justify-center gap-1.5"
-                      >
-                        <Store className="w-3.5 h-3.5 text-amber-400" />
-                        <span>{t.cityMarket}</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          sfx.playClick();
-                          onEnterSettlement?.(selectedSettlement.id);
-                        }}
-                        className="medieval-iron-btn py-1.5 px-2 rounded-lg text-[11px] flex items-center justify-center gap-1.5"
-                      >
-                        <Beer className="w-3.5 h-3.5 text-amber-300" />
-                        <span>{t.cityTavern}</span>
-                      </button>
-                    </div>
-
-                    {/* Enemy Siege Option */}
                     {isSelectedEnemy && (
                       <button
                         onClick={() => {
@@ -677,7 +831,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
                             onStartSiegeCamp?.(selectedSettlement.id);
                           }
                         }}
-                        className="medieval-crimson-btn w-full py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs font-bold mt-1"
+                        className="medieval-crimson-btn w-full py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs font-bold"
                       >
                         <Swords className="w-4 h-4 text-red-200" />
                         <span>
@@ -690,8 +844,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
                   </>
                 ) : (
                   <>
-                    {/* Distance & March Action */}
-                    <div className="text-[11px] text-stone-400 text-center py-1 flex items-center justify-center gap-1.5">
+                    <div className="text-[11px] text-stone-400 text-center py-0.5 flex items-center justify-center gap-1.5">
                       <Footprints className="w-3.5 h-3.5 text-amber-400" />
                       <span>
                         {lang === 'ku'
@@ -705,12 +858,10 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
                         sfx.playClick();
                         onMarchToSettlement?.(selectedSettlement.id);
                       }}
-                      className="medieval-gold-btn w-full py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 text-xs"
+                      className="medieval-gold-btn w-full py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs"
                     >
                       <Footprints className="w-4 h-4 text-stone-950" />
-                      <span>
-                        {lang === 'ku' ? 'بەرەو ئێرە بڕۆ (March)' : 'March Army Here'}
-                      </span>
+                      <span>{lang === 'ku' ? 'بەرەو ئێرە بڕۆ (March)' : 'March Army Here'}</span>
                     </button>
 
                     {isSelectedEnemy && (
@@ -719,7 +870,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
                           sfx.playClick();
                           onMarchToSettlement?.(selectedSettlement.id);
                         }}
-                        className="medieval-crimson-btn w-full py-1.5 px-2 rounded-lg text-[11px] flex items-center justify-center gap-1.5 mt-0.5"
+                        className="medieval-crimson-btn w-full py-1.5 px-2 rounded-lg text-[11px] flex items-center justify-center gap-1.5"
                       >
                         <Swords className="w-3.5 h-3.5 text-red-200" />
                         <span>{lang === 'ku' ? 'بڕۆ بۆ گەمارۆدان' : 'March to Besiege'}</span>
@@ -733,8 +884,179 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
         )}
       </div>
 
-      {/* Subtle Bottom Ambient Gradient */}
-      <div className="h-4 bg-gradient-to-t from-stone-950/80 to-transparent pointer-events-none" />
+      {/* =========================================================================
+          BOTTOM REGION:
+          - F. Bottom-Left Interactive Minimap
+          - E. Bottom Navigation Dock
+         ========================================================================= */}
+      <footer className="w-full pointer-events-none px-2 sm:px-4 pb-2.5 flex items-end justify-between z-30">
+        {/* =========================================================================
+            F. BOTTOM-LEFT MINIMAP (Representing real Three.js map & camera position)
+           ========================================================================= */}
+        <div className="pointer-events-auto medieval-panel rounded-2xl p-1.5 shadow-2xl border-amber-600/40 flex flex-col gap-1 w-36 sm:w-44">
+          {/* Header & Controls bar */}
+          <div className="flex items-center justify-between px-1 text-[10px] text-amber-300/90 font-serif font-bold border-b border-amber-500/20 pb-0.5">
+            <span className="flex items-center gap-1">
+              <Compass className="w-3 h-3 text-amber-400" />
+              {lang === 'ku' ? 'نەخشەی نەخش' : 'Minimap'}
+            </span>
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={() => {
+                  sfx.playClick();
+                  cameraControls?.focusPlayer();
+                }}
+                className="p-0.5 hover:text-white rounded"
+                title="سەر کارەکتەر"
+              >
+                <Crosshair className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => {
+                  sfx.playClick();
+                  cameraControls?.zoomIn();
+                }}
+                className="p-0.5 hover:text-white rounded"
+                title="Zoom In"
+              >
+                <ZoomIn className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => {
+                  sfx.playClick();
+                  cameraControls?.zoomOut();
+                }}
+                className="p-0.5 hover:text-white rounded"
+                title="Zoom Out"
+              >
+                <ZoomOut className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+
+          {/* Canvas Minimap Surface */}
+          <div className="relative w-full h-24 sm:h-28 rounded-lg overflow-hidden border border-amber-600/25 bg-stone-950 cursor-crosshair">
+            <canvas
+              ref={minimapCanvasRef}
+              width={160}
+              height={110}
+              onClick={handleMinimapClick}
+              className="w-full h-full block"
+              title="کلیک بکە بۆ جوڵاندنی کامێرا"
+            />
+            {/* Cardinal points */}
+            <span className="absolute top-0.5 left-1/2 -translate-x-1/2 text-[8px] font-bold text-amber-400/80 pointer-events-none">
+              N
+            </span>
+            <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] font-bold text-amber-400/80 pointer-events-none">
+              S
+            </span>
+            <span className="absolute left-0.5 top-1/2 -translate-y-1/2 text-[8px] font-bold text-amber-400/80 pointer-events-none">
+              W
+            </span>
+            <span className="absolute right-0.5 top-1/2 -translate-y-1/2 text-[8px] font-bold text-amber-400/80 pointer-events-none">
+              E
+            </span>
+          </div>
+        </div>
+
+        {/* =========================================================================
+            E. BOTTOM NAVIGATION DOCK (Matching IMAGE 1 Structure)
+           ========================================================================= */}
+        <nav className="pointer-events-auto medieval-panel rounded-2xl p-1.5 flex items-center gap-1 sm:gap-2 shadow-2xl border-amber-600/40 mx-auto">
+          {/* 1. World Map */}
+          <button
+            onClick={() => {
+              sfx.playClick();
+              onOpenView('map');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition ${
+              activeView === 'map'
+                ? 'medieval-gold-btn'
+                : 'text-stone-300 hover:bg-stone-800/80 hover:text-amber-300'
+            }`}
+            title={t.tabWorld}
+          >
+            <Map className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline">{lang === 'ku' ? 'نەخشەی جیهان' : 'World Map'}</span>
+          </button>
+
+          {/* 2. Kingdoms */}
+          <button
+            onClick={() => {
+              sfx.playClick();
+              onOpenView('diplomacy');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition ${
+              activeView === 'diplomacy'
+                ? 'medieval-gold-btn'
+                : 'text-stone-300 hover:bg-stone-800/80 hover:text-amber-300'
+            }`}
+            title={t.tabDiplomacy}
+          >
+            <Crown className="w-4 h-4 text-amber-300" />
+            <span className="hidden sm:inline">{lang === 'ku' ? 'شانشینەکان' : 'Kingdoms'}</span>
+          </button>
+
+          {/* 3. War */}
+          <button
+            onClick={() => {
+              sfx.playClick();
+              if (gameState.player.isBesiegingSettlementId) {
+                onOpenView('siege_camp');
+              } else {
+                onOpenView('party');
+              }
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition ${
+              activeView === 'party' || activeView === 'siege_camp'
+                ? 'medieval-gold-btn'
+                : 'text-stone-300 hover:bg-stone-800/80 hover:text-amber-300'
+            }`}
+            title="شەڕ و سوپا"
+          >
+            <Swords className="w-4 h-4 text-red-400" />
+            <span className="hidden sm:inline">{lang === 'ku' ? 'شەڕ و سوپا' : 'War'}</span>
+          </button>
+
+          {/* 4. Intelligence and Events */}
+          <button
+            onClick={() => {
+              sfx.playClick();
+              onOpenView('news');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition ${
+              activeView === 'news'
+                ? 'medieval-gold-btn'
+                : 'text-stone-300 hover:bg-stone-800/80 hover:text-amber-300'
+            }`}
+            title="سیخوڕی و هەواڵەکان"
+          >
+            <Eye className="w-4 h-4 text-emerald-400" />
+            <span className="hidden sm:inline">{lang === 'ku' ? 'سیخوڕی و هەواڵ' : 'Intelligence'}</span>
+          </button>
+
+          {/* 5. Achievements / Chronicle */}
+          <button
+            onClick={() => {
+              sfx.playClick();
+              onOpenView('log');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition ${
+              activeView === 'log'
+                ? 'medieval-gold-btn'
+                : 'text-stone-300 hover:bg-stone-800/80 hover:text-amber-300'
+            }`}
+            title={t.tabLog}
+          >
+            <Trophy className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline">{lang === 'ku' ? 'مێژوو و سەرکەوتن' : 'Chronicle'}</span>
+          </button>
+        </nav>
+
+        {/* Empty placeholder on the right of footer to maintain center alignment of dock */}
+        <div className="w-36 sm:w-44 pointer-events-none" />
+      </footer>
     </div>
   );
 };

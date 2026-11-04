@@ -188,6 +188,8 @@ export interface Party {
   statusText?: string;
   statusTextKu?: string;
   besiegingSettlementId?: string;
+  pathWaypoints?: Array<{ x: number; z: number }>;
+  waypointIndex?: number;
 }
 
 export interface RealmPolicy {

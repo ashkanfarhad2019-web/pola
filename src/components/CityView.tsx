@@ -37,6 +37,7 @@ interface CityViewProps {
   onChangeTaxRate: (settlementId: string, rate: Settlement['taxRate']) => void;
   onOpenSiegeCamp?: (settlementId: string) => void;
   onStartSiegeCamp?: (settlementId: string) => void;
+  initialSection?: 'hub' | 'market' | 'tavern' | 'keep' | 'workshops' | 'siege';
 }
 
 export const CityView: React.FC<CityViewProps> = ({
@@ -52,10 +53,11 @@ export const CityView: React.FC<CityViewProps> = ({
   onChangeTaxRate,
   onOpenSiegeCamp,
   onStartSiegeCamp,
+  initialSection = 'hub',
 }) => {
   const t = TRANSLATIONS[lang];
   // 'hub' = main menu, 'market', 'tavern', 'keep', 'workshops', 'siege'
-  const [currentSection, setCurrentSection] = useState<'hub' | 'market' | 'tavern' | 'keep' | 'workshops' | 'siege'>('hub');
+  const [currentSection, setCurrentSection] = useState<'hub' | 'market' | 'tavern' | 'keep' | 'workshops' | 'siege'>(initialSection);
   const [tradeQuantity, setTradeQuantity] = useState<number>(5);
 
   const faction = gameState.factions[settlement.factionId];

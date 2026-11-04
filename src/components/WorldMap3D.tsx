@@ -25,6 +25,8 @@ export interface MapCameraControls {
   zoomIn: () => void;
   zoomOut: () => void;
   isFollowing: boolean;
+  panTo?: (x: number, z: number) => void;
+  getCameraTarget?: () => { x: number; z: number };
 }
 
 interface WorldMap3DProps {
@@ -80,6 +82,16 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
     zoomLevelRef.current = 1.1;
   };
 
+  // Pan Camera to specific world coordinate (from minimap or strategic jump)
+  const handlePanTo = (x: number, z: number) => {
+    isFollowingPlayerRef.current = false;
+    setIsFollowing(false);
+    cameraTargetRef.current = {
+      x: Math.max(-125, Math.min(125, x)),
+      z: Math.max(-135, Math.min(135, z)),
+    };
+  };
+
   // Zoom In / Out Buttons for Desktop Users
   const handleZoom = (delta: number) => {
     sfx.playClick();
@@ -94,6 +106,8 @@ export const WorldMap3D: React.FC<WorldMap3DProps> = ({
         zoomIn: () => handleZoom(-0.35),
         zoomOut: () => handleZoom(0.35),
         isFollowing,
+        panTo: handlePanTo,
+        getCameraTarget: () => ({ x: cameraTargetRef.current.x, z: cameraTargetRef.current.z }),
       });
     }
   }, [isFollowing, onRegisterCameraControls]);
